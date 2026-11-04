@@ -1,10 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "Job Portal Clipper",
+  "name": "Resume Submission Portal",
   "version": "0.1.0",
-  "description": "Save job postings to your Job Portal in one click and autofill company application forms for review.",
-  "action": { "default_popup": "popup.html", "default_title": "Save to Job Portal" },
-  "background": { "service_worker": "background.js" },
+  "description": "Save job postings to your Resume Portal in one click and fill company application forms for your review.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Save to Resume Portal"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "options_page": "options.html",
-  "permissions": ["activeTab", "scripting", "storage"]
+  "permissions": ["activeTab", "scripting", "storage"],
+  "short_name": "Resume Portal"
 }
