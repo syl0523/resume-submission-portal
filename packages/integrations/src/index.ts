@@ -2,6 +2,7 @@ export * from './boards';
 export * from './email';
 export * from './errors';
 export * from './fit';
+export * from './http';
 export * from './imports';
 export * from './jobposting';
 export * from './match';

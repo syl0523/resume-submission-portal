@@ -156,11 +156,14 @@ application with an `import` event. Row-level problems go to `errors`.
 | `DELETE /api/boards/:id`                | –                                                             | 204                                                                                               |
 | `POST /api/boards/:id/sync`             | –                                                             | `WatchedBoard`                                                                                    |
 | `GET /api/boards/postings`              | `boardId`, `onlyNew` (`true`/`false`), `q`, `limit`, `offset` | `ListResponse<BoardPosting>` (open, not dismissed)                                                |
-| `POST /api/boards/postings/:id/save`    | `{ status?: 'saved' \| 'applied' }`                           | 201 `ApplicationDetail`                                                                           |
+| `POST /api/boards/postings/:id/save`    | `{ status?: 'saved' \| 'applied' }`                           | 201 `ApplicationDetail` (200 with the existing application when the job was already saved)        |
 | `POST /api/boards/postings/:id/dismiss` | –                                                             | 204                                                                                               |
 
 Open = seen in the latest sync. `isNew` = first seen after the board's baseline sync, within the last 7
-days, and not saved. Saving fetches full details with `fetchJobFromUrl` when possible.
+days, and not saved. Saving fetches full details with `fetchJobFromUrl` when possible. A failed sync keeps
+the previous postings and records the reason in `lastError`; the daily cron syncs every board and marks
+active applications with no activity for `GHOST_AFTER_DAYS` (default 21) as `ghosted` (source `system`,
+`lastActivityAt` unchanged).
 
 ## Saved searches (Job Match, US-first)
 

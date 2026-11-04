@@ -33,6 +33,14 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   AI_MODEL_FAST?: string;
   AI_MODEL_SMART?: string;
+
+  /** Outbound fetch for job-board, search and AI APIs. Tests inject a fake; production omits it. */
+  OUTBOUND_FETCH?: typeof fetch;
+}
+
+/** The fetch to use for third-party APIs. */
+export function outboundFetch(env: Env): typeof fetch {
+  return env.OUTBOUND_FETCH ?? ((input, init) => fetch(input, init));
 }
 
 export interface AuthUser {

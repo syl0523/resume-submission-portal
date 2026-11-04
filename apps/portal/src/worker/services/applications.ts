@@ -19,7 +19,7 @@ import { analyzeJobUrl, normalizeCompany } from '@jsp/integrations';
 import { and, desc, eq } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { type Db, runBatch } from '../db/client';
-import { applicationEvents, applications, jobs, resumes } from '../db/schema';
+import { type ApplicationRow, applicationEvents, applications, jobs, resumes } from '../db/schema';
 import { type Env, numberVar } from '../env';
 import { newId } from '../lib/crypto';
 import { HttpError, notFound } from '../lib/errors';
@@ -123,18 +123,17 @@ export interface CreateApplicationResult {
   duplicate: boolean;
 }
 
-/** Create job + application + creation event atomically, or return the existing duplicate. */
-export async function createApplication(
+/**
+ * Statements that create job + application + creation event, without any reads. Callers that
+ * already know the posting is new (bulk import) batch these directly.
+ */
+export function buildCreateStatements(
   db: Db,
   env: Env,
   userId: string,
   params: CreateApplicationParams,
-): Promise<CreateApplicationResult> {
-  const job = prepareJob(params.job);
-  const existing = await findExistingApplication(db, userId, job);
-  if (existing) return { applicationId: existing, duplicate: true };
-  if (params.resumeId) await assertResumeOwned(db, userId, params.resumeId);
-
+  job: PreparedJob,
+): { statements: BatchItem<'sqlite'>[]; applicationId: string; jobId: string } {
   const now = nowIso();
   const occurredAt = toIso(params.occurredAt) ?? now;
   const submitted = params.status !== 'saved' && params.status !== 'withdrawn';
@@ -203,7 +202,22 @@ export async function createApplication(
       createdAt: now,
     }),
   ];
+  return { statements, applicationId, jobId };
+}
 
+/** Create job + application + creation event atomically, or return the existing duplicate. */
+export async function createApplication(
+  db: Db,
+  env: Env,
+  userId: string,
+  params: CreateApplicationParams,
+): Promise<CreateApplicationResult> {
+  const job = prepareJob(params.job);
+  const existing = await findExistingApplication(db, userId, job);
+  if (existing) return { applicationId: existing, duplicate: true };
+  if (params.resumeId) await assertResumeOwned(db, userId, params.resumeId);
+
+  const { statements, applicationId } = buildCreateStatements(db, env, userId, params, job);
   try {
     await runBatch(db, statements);
   } catch (err) {
@@ -236,24 +250,24 @@ export interface TransitionResult {
   eventId: string | null;
 }
 
+/** The application fields a status change reads. */
+export type TransitionTarget = Pick<
+  ApplicationRow,
+  'id' | 'status' | 'appliedAt' | 'nextFollowUpAt' | 'lastActivityAt'
+>;
+
 /**
- * Apply a proposed status through `decideTransition`, keeping appliedAt, follow-up date, activity
- * time and the timeline consistent. Scoped to the user; unknown ids are a 404.
+ * Statements for a proposed status change through `decideTransition`, keeping appliedAt, the
+ * follow-up date, activity time and the timeline consistent. No reads: bulk callers (import,
+ * cron) load applications once and batch these.
  */
-export async function transitionStatus(
+export function buildTransitionStatements(
   db: Db,
   env: Env,
   userId: string,
-  applicationId: string,
+  app: TransitionTarget,
   p: TransitionParams,
-): Promise<TransitionResult> {
-  const app = await db
-    .select()
-    .from(applications)
-    .where(and(eq(applications.id, applicationId), eq(applications.userId, userId)))
-    .get();
-  if (!app) throw notFound('Application');
-
+): { statements: BatchItem<'sqlite'>[]; result: TransitionResult } {
   const decision = decideTransition(app.status, p.proposed, p.source);
   const now = nowIso();
   const occurredAt = toIso(p.occurredAt) ?? now;
@@ -277,17 +291,18 @@ export async function transitionStatus(
           status: to,
           appliedAt,
           nextFollowUpAt,
-          lastActivityAt: latestActivity,
+          // The system marking silence is not activity.
+          lastActivityAt: p.source === 'system' ? app.lastActivityAt : latestActivity,
           updatedAt: now,
         })
-        .where(eq(applications.id, app.id)),
+        .where(and(eq(applications.id, app.id), eq(applications.userId, userId))),
     );
   } else if (p.alwaysRecord && p.eventType === 'email') {
     statements.push(
       db
         .update(applications)
         .set({ lastActivityAt: latestActivity, updatedAt: now })
-        .where(eq(applications.id, app.id)),
+        .where(and(eq(applications.id, app.id), eq(applications.userId, userId))),
     );
   }
 
@@ -314,14 +329,38 @@ export async function transitionStatus(
     );
   }
 
-  await runBatch(db, statements);
   return {
-    changed: decision.apply,
-    reason: decision.reason,
-    from: app.status,
-    to: decision.apply ? p.proposed : app.status,
-    eventId,
+    statements,
+    result: {
+      changed: decision.apply,
+      reason: decision.reason,
+      from: app.status,
+      to: decision.apply ? p.proposed : app.status,
+      eventId,
+    },
   };
+}
+
+/**
+ * Apply a proposed status through `decideTransition`, keeping appliedAt, follow-up date, activity
+ * time and the timeline consistent. Scoped to the user; unknown ids are a 404.
+ */
+export async function transitionStatus(
+  db: Db,
+  env: Env,
+  userId: string,
+  applicationId: string,
+  p: TransitionParams,
+): Promise<TransitionResult> {
+  const app = await db
+    .select()
+    .from(applications)
+    .where(and(eq(applications.id, applicationId), eq(applications.userId, userId)))
+    .get();
+  if (!app) throw notFound('Application');
+  const { statements, result } = buildTransitionStatements(db, env, userId, app, p);
+  await runBatch(db, statements);
+  return result;
 }
 
 export interface AddEventParams {
