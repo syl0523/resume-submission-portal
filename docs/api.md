@@ -230,6 +230,13 @@ query (`q`, `where`, `remote`, `provider=all|jsearch|adzuna|usajobs|boards`). It
   saved answers) and the job (`applicationId` or `jobDescription`), within `maxWords`. Truthful to the
   profile; never invents experience.
 - Both return 501 `feature_disabled` without `ANTHROPIC_API_KEY`.
+- Models: `AI_MODEL_SMART` (default `claude-opus-5-5`) writes fit reports, cover letters, answers and the
+  profile / saved-search drafts; `AI_MODEL_FAST` (default `claude-haiku-5-5`) handles the email second
+  opinion and Job Match re-ranking. Structured answers use JSON-schema outputs; resumes go in as a PDF
+  document block (other files: their stored text), marked for prompt caching. Opus/Sonnet requests opt into
+  server-side refusal fallback (`fallbacks: "default"`).
+- A declined request is 422 `unprocessable`; an AI service failure (after the SDK's retries) is 502
+  `upstream_error`.
 
 ## Calendar feed
 
