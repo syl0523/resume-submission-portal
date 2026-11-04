@@ -1,4 +1,12 @@
-import type { AiAnswer, EmailClassification, Profile } from '@jsp/core';
+import type {
+  AiAnswer,
+  EmailClassification,
+  JobFit,
+  JobInputParsed,
+  Profile,
+  SavedSearchDraft,
+  SearchProfileParsed,
+} from '@jsp/core';
 import type { EmailMessage } from '@jsp/integrations';
 import type { ResumeRow } from '../db/schema';
 import type { Env } from '../env';
@@ -63,4 +71,28 @@ export async function classifyEmailWithAi(
   void message;
   void rules;
   return null;
+}
+
+/** Draft a Job Match track from a resume (titles, skills, seniority, US locations…). TODO(KAN-39). */
+export async function draftSearchFromResume(
+  env: Env,
+  resume: ResumeRow,
+): Promise<SavedSearchDraft> {
+  requireAi(env);
+  void resume;
+  throw new HttpError(501, 'feature_disabled', 'Search drafts are not implemented yet');
+}
+
+/**
+ * Re-score the top postings with a fast model and a one-line reason. Returns one entry per input
+ * (null where the model gave nothing usable). TODO(KAN-39).
+ */
+export async function rerankHits(
+  env: Env,
+  criteria: SearchProfileParsed,
+  items: { job: JobInputParsed; fit: JobFit }[],
+): Promise<({ score: number; reason: string } | null)[]> {
+  void env;
+  void criteria;
+  return items.map(() => null);
 }

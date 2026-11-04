@@ -1,0 +1,210 @@
+import { jobInputSchema, type SearchProfileParsed, searchProfileSchema } from '@jsp/core';
+import { describe, expect, it } from 'vitest';
+import { scoreJobFit, titleSimilarity } from '../fit';
+import { dedupeJobs } from './dedupe';
+import { buildDeepLinks } from './deeplinks';
+import { planQueries } from './plan';
+
+const NOW = new Date('2026-11-04T12:00:00Z');
+
+const profile = (over: Partial<SearchProfileParsed> = {}): SearchProfileParsed =>
+  searchProfileSchema.parse({
+    titles: ['HR Generalist', 'HR Business Partner'],
+    skills: ['HRIS', 'Workday', 'Employee relations', 'FMLA', 'Onboarding'],
+    locations: ['Austin, TX'],
+    keywords: [],
+    excludeKeywords: ['commission only'],
+    minSalary: 65000,
+    ...over,
+  });
+
+const job = (over: Record<string, unknown> = {}) =>
+  jobInputSchema.parse({
+    title: 'Human Resources Generalist II',
+    company: 'Northwind Freight',
+    location: 'Austin, TX',
+    remoteType: 'hybrid',
+    description:
+      'You will manage onboarding, employee relations and FMLA cases in Workday. HRIS experience a plus.',
+    salaryMin: 68000,
+    salaryMax: 80000,
+    postedAt: '2026-11-02T12:00:00Z',
+    ...over,
+  });
+
+describe('scoreJobFit', () => {
+  it('scores a strong match high and explains why', () => {
+    const fit = scoreJobFit(profile(), job(), NOW);
+    expect(fit.score).toBeGreaterThanOrEqual(85);
+    expect(fit.titleMatch).toBeGreaterThanOrEqual(0.9);
+    expect(fit.matchedSkills).toEqual([
+      'HRIS',
+      'Workday',
+      'Employee relations',
+      'FMLA',
+      'Onboarding',
+    ]);
+    expect(fit.reasons).toEqual(
+      expect.arrayContaining([
+        'Title matches “HR Generalist”',
+        'In Austin, TX',
+        'Posted 2 days ago',
+        'Pay meets your minimum',
+      ]),
+    );
+    expect(fit.excluded).toBe(false);
+  });
+
+  it('scores an unrelated job low', () => {
+    const fit = scoreJobFit(
+      profile(),
+      job({
+        title: 'Forklift Operator',
+        description: 'Operate forklifts.',
+        location: 'Denver, CO',
+      }),
+      NOW,
+    );
+    expect(fit.score).toBeLessThan(40);
+  });
+
+  it('flags work-authorization language and excludes it when sponsorship is needed', () => {
+    const text =
+      'Candidates must be authorized to work in the US without sponsorship. Active secret clearance required.';
+    const flagged = scoreJobFit(profile(), job({ description: text }), NOW);
+    expect(flagged.flags).toEqual(expect.arrayContaining(['no_sponsorship', 'clearance_required']));
+    expect(flagged.excluded).toBe(false);
+    expect(
+      scoreJobFit(profile({ needsSponsorship: true }), job({ description: text }), NOW).excluded,
+    ).toBe(true);
+  });
+
+  it('excludes on keywords and the salary floor, and notes contracts and stale postings', () => {
+    expect(
+      scoreJobFit(profile(), job({ description: 'Commission only role.' }), NOW),
+    ).toMatchObject({
+      excluded: true,
+      flags: expect.arrayContaining(['excluded_keyword']),
+    });
+    expect(
+      scoreJobFit(profile(), job({ salaryMin: 40000, salaryMax: 50000 }), NOW).flags,
+    ).toContain('salary_below_min');
+    const contract = scoreJobFit(
+      profile(),
+      job({ title: 'HR Generalist (Contract)', postedAt: '2026-08-01T00:00:00Z' }),
+      NOW,
+    );
+    expect(contract.flags).toEqual(expect.arrayContaining(['contract_role', 'stale_posting']));
+  });
+
+  it('prefers remote postings for remote searches', () => {
+    const remote = profile({ workMode: 'remote', locations: [] });
+    const a = scoreJobFit(remote, job({ remoteType: 'remote', location: 'Remote (US)' }), NOW);
+    const b = scoreJobFit(remote, job({ remoteType: 'onsite', location: 'Chicago, IL' }), NOW);
+    expect(a.score).toBeGreaterThan(b.score);
+    expect(a.reasons).toContain('Remote, as preferred');
+  });
+
+  it('understands title abbreviations', () => {
+    expect(
+      titleSimilarity('HR Business Partner', 'Senior Human Resources Business Partner'),
+    ).toBeGreaterThan(0.9);
+    expect(titleSimilarity('TA Partner', 'Talent Acquisition Partner')).toBeGreaterThan(0.9);
+    expect(titleSimilarity('HR Generalist', 'Software Engineer')).toBeLessThan(0.4);
+  });
+});
+
+describe('planQueries', () => {
+  it('interleaves titles and places, adding a remote query, within the cap', () => {
+    const queries = planQueries(profile({ locations: ['Austin, TX', 'Remote'] }), 4);
+    expect(queries.map((q) => [q.title, q.location, q.remote])).toEqual([
+      ['HR Generalist', 'Austin, TX', false],
+      ['HR Generalist', null, true],
+      ['HR Business Partner', 'Austin, TX', false],
+      ['HR Business Partner', null, true],
+    ]);
+    expect(planQueries(profile({ locations: [] }), 8).map((q) => q.location)).toEqual([null, null]);
+    expect(planQueries(profile(), 1)).toHaveLength(1);
+  });
+});
+
+describe('dedupeJobs', () => {
+  it('merges one job seen on LinkedIn, Indeed and the employer ATS, keeping the employer link', () => {
+    const merged = dedupeJobs([
+      {
+        sourceLabel: 'LinkedIn',
+        job: job({
+          url: 'https://www.linkedin.com/jobs/view/4000000001/',
+          source: 'linkedin',
+          description: 'short',
+        }),
+      },
+      {
+        sourceLabel: 'Adzuna',
+        job: job({
+          title: 'Other role',
+          company: 'Elsewhere',
+          url: 'https://www.adzuna.com/details/123',
+          source: 'adzuna',
+        }),
+      },
+      {
+        sourceLabel: 'Company site',
+        job: job({
+          url: 'https://job-boards.greenhouse.io/northwind/jobs/101',
+          source: 'greenhouse',
+          description: 'a much longer description of the role',
+          salaryMin: null,
+          salaryMax: null,
+          postedAt: '2026-11-01T12:00:00Z',
+        }),
+      },
+      {
+        sourceLabel: 'Indeed',
+        job: job({
+          title: 'Human Resources Generalist II',
+          url: 'https://www.indeed.com/viewjob?jk=0123456789abcdef',
+          source: 'indeed',
+          description: 'medium length text',
+        }),
+      },
+    ]);
+    expect(merged).toHaveLength(2);
+    expect(merged[0]?.job).toMatchObject({
+      url: 'https://job-boards.greenhouse.io/northwind/jobs/101',
+      description: 'a much longer description of the role',
+      salaryMin: 68000,
+      postedAt: '2026-11-01T12:00:00Z',
+    });
+    expect(merged[0]?.sourceLabel).toBe('Company site');
+    expect(merged[1]?.job.company).toBe('Elsewhere');
+  });
+
+  it('keeps similar titles at different companies or places apart', () => {
+    const items = [
+      { sourceLabel: 'A', job: job({ url: null }) },
+      { sourceLabel: 'B', job: job({ url: null, location: 'Seattle, WA' }) },
+      { sourceLabel: 'C', job: job({ url: null, company: 'Contoso' }) },
+    ];
+    expect(dedupeJobs(items)).toHaveLength(3);
+  });
+});
+
+describe('buildDeepLinks', () => {
+  it('builds LinkedIn, Indeed and Google Jobs searches with filters', () => {
+    const groups = buildDeepLinks(
+      profile({ locations: ['Austin, TX', 'Remote'], seniority: 'mid_senior' }),
+    );
+    expect(groups.map((g) => g.site)).toEqual(['linkedin', 'indeed', 'google']);
+    const [linkedin, indeed, google] = groups;
+    expect(linkedin?.links[0]?.label).toBe('HR Generalist · Austin, TX');
+    const li = new URL(linkedin?.links[0]?.url ?? '');
+    expect(li.searchParams.get('keywords')).toBe('HR Generalist');
+    expect(li.searchParams.get('f_TPR')).toBe('r604800');
+    expect(li.searchParams.get('f_E')).toBe('4');
+    expect(new URL(linkedin?.links[1]?.url ?? '').searchParams.get('f_WT')).toBe('2');
+    expect(new URL(indeed?.links[1]?.url ?? '').searchParams.get('remotejob')).toBeTruthy();
+    expect(new URL(google?.links[0]?.url ?? '').searchParams.get('ibp')).toBe('htl;jobs');
+    expect(linkedin?.links).toHaveLength(4);
+  });
+});
