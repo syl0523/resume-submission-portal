@@ -1,3 +1,4 @@
+import type { BatchItem } from 'drizzle-orm/batch';
 import { drizzle } from 'drizzle-orm/d1';
 import * as schema from './schema';
 
@@ -15,3 +16,10 @@ export function chunk<T>(rows: T[], size: number): T[][] {
 }
 
 export { schema };
+
+/** Run statements atomically with D1 batch (D1 has no interactive transactions). No-op when empty. */
+export async function runBatch(db: Db, statements: BatchItem<'sqlite'>[]): Promise<void> {
+  const [first, ...rest] = statements;
+  if (!first) return;
+  await db.batch([first, ...rest]);
+}

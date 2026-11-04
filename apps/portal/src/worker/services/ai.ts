@@ -1,0 +1,33 @@
+import type { AiAnswer, Profile } from '@jsp/core';
+import type { Env } from '../env';
+import { HttpError } from '../lib/errors';
+
+/**
+ * Claude-powered helpers. Owned by the automation API agent (KAN-32, KAN-33, KAN-39, KAN-44, KAN-45):
+ * email second opinion, fit report + cover letter, answers, saved-search and profile drafts from a
+ * resume, hit re-ranking. Keep the two exported signatures below stable: other routes call them.
+ */
+
+export function aiEnabled(env: Env): boolean {
+  return Boolean(env.ANTHROPIC_API_KEY?.trim());
+}
+
+export function requireAi(env: Env): void {
+  if (!aiEnabled(env)) {
+    throw new HttpError(501, 'feature_disabled', 'AI is not configured (set ANTHROPIC_API_KEY)');
+  }
+}
+
+export interface AnswerQuestionInput {
+  question: string;
+  maxWords: number;
+  profile: Profile;
+  job: { title: string; company: string; description: string | null } | null;
+}
+
+/** Draft an answer to an application question, grounded in the profile. TODO(api-automation agent). */
+export async function answerQuestion(env: Env, input: AnswerQuestionInput): Promise<AiAnswer> {
+  requireAi(env);
+  void input;
+  throw new HttpError(501, 'feature_disabled', 'AI answers are not implemented yet');
+}
