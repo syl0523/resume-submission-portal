@@ -1,4 +1,5 @@
 import type { AiAnswer, Profile } from '@jsp/core';
+import type { ResumeRow } from '../db/schema';
 import type { Env } from '../env';
 import { HttpError } from '../lib/errors';
 
@@ -30,4 +31,20 @@ export async function answerQuestion(env: Env, input: AnswerQuestionInput): Prom
   requireAi(env);
   void input;
   throw new HttpError(501, 'feature_disabled', 'AI answers are not implemented yet');
+}
+
+/**
+ * Read contact details, headline, summary, skills, languages, experience and education from a
+ * resume (PDF as a document block, other files from their stored text), merged over `current`.
+ * Not saved. TODO(api-automation agent, KAN-44).
+ */
+export async function draftProfileFromResume(
+  env: Env,
+  resume: ResumeRow,
+  current: Profile,
+): Promise<Profile> {
+  requireAi(env);
+  void resume;
+  void current;
+  throw new HttpError(501, 'feature_disabled', 'Profile drafts are not implemented yet');
 }
