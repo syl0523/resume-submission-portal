@@ -93,11 +93,15 @@ resume becomes the default; setting `isDefault: true` clears it on the others. R
 - `submitted` = applications not in `saved`. `responded` = submitted applications currently in `viewed`,
   `screening`, `interview`, `offer` or `rejected`. `responseRate = responded / submitted` (0 when none).
 - `interviewRate` = submitted applications that ever reached `screening`, `interview` or `offer` (current
-  status or any `status_change` event) / submitted.
+  status, or any timeline entry that moved them there: manual, email or import) / submitted.
+- `appliedLast7Days` / `appliedLast30Days`: applications with `appliedAt` in the last 7 / 30 days.
 - `followUpsDue`: active applications with `nextFollowUpAt <= now`, oldest first, max 10.
+- `upcomingInterviews`: `interview` events scheduled from now on, soonest first, max 10, leaving out
+  rejected and withdrawn applications.
 - `recentEvents`: latest 15 events with company and title.
 - `weekly`: last 12 ISO weeks (Monday, UTC), oldest first. `applied` = applications with `appliedAt` in the
-  week; `responses` = `status_change` events into a responded status in the week.
+  week; `responses` = status changes into a responded status in the week, however they arrived (timeline
+  entries with `fromStatus` set: manual `status_change`, `email` or `import`).
 - `bySource`: application count per job source, descending.
 
 ## Inbox (email-based status tracking)
