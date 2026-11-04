@@ -6,7 +6,6 @@ export interface Env {
   FILES: R2Bucket;
   ASSETS?: Fetcher;
 
-  APP_NAME?: string;
   /** "access" (Cloudflare Access JWT, production) or "dev" (fixed local user). */
   AUTH_MODE?: string;
   DEV_USER_EMAIL?: string;

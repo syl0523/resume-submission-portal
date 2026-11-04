@@ -18,6 +18,24 @@ stands, without handing your LinkedIn or Indeed account to a bot.
 - **Your record.** Resume versions are immutable and linked to each application; full timeline; CSV export;
   import your LinkedIn application history.
 
+## Status
+
+Phase 1 runs end to end locally (`pnpm dev`); deploying it to Cloudflare is next. As of November 2026:
+
+| Area                                                                   | State                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| API, data model and status engine                                      | Done                                                                       |
+| Email forwarding and automatic tracking                                | Done                                                                       |
+| CSV and LinkedIn import, company boards, daily cron, calendar feed     | Done                                                                       |
+| Job Match: saved searches, fit scoring, duplicate merging, Discover    | Done                                                                       |
+| AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                                       |
+| Web app                                                                | Done                                                                       |
+| Chrome extension                                                       | Paused: pairing and autofill planner built, popup not yet (KAN-30, 31, 43) |
+| Production on Cloudflare                                               | Next (KAN-34)                                                              |
+
+Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/JSP/pages/393219)
+is in Confluence.
+
 ## Architecture in one picture
 
 ```text

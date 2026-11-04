@@ -22,8 +22,8 @@ Local mode signs you in as `DEV_USER_EMAIL` (localhost only). Optional keys go i
 3. **Database and storage.**
 
    ```bash
-   pnpm exec wrangler d1 create job-portal          # paste the database_id into wrangler.jsonc
-   pnpm exec wrangler r2 bucket create job-portal-files
+   pnpm exec wrangler d1 create resume-submission-portal   # paste the database_id into wrangler.jsonc
+   pnpm exec wrangler r2 bucket create resume-submission-portal-files
    ```
 4. **Secrets** (only the ones you use):
 
@@ -77,9 +77,13 @@ trackers work too: export as CSV with Company, Title, URL, Date Applied, Status,
 
 ## Install the browser extension
 
-Download `job-portal-extension` from the latest CI run (or `pnpm --filter @jsp/extension build`), unzip,
+Not ready yet: pairing (the options page) and the autofill script are built, but the toolbar popup that
+saves a job and starts autofill is still a placeholder (KAN-30). Until it lands you can pair the extension,
+not use it.
+
+Download `resume-portal-extension` from the latest CI run (or `pnpm --filter @jsp/extension build`), unzip,
 open `chrome://extensions`, enable Developer mode → **Load unpacked** → the folder (`apps/extension/dist`).
-Open the extension's options: portal URL plus a token from Settings → Extension tokens.
+Open the extension's options: the portal address plus a token from Settings → Browser extension.
 
 ## API keys
 
@@ -89,6 +93,10 @@ Open the extension's options: portal URL plus a token from Settings → Extensio
 | Adzuna    | developer.adzuna.com                           | `app_id` + `app_key`; US index by default (`ADZUNA_COUNTRY=us`)                        |
 | USAJOBS   | developer.usajobs.gov → API request            | Key is emailed; `USAJOBS_USER_AGENT` must be that email                                |
 | Anthropic | console.anthropic.com                          | Enables resume drafts, fit reports, answers and email second opinion                   |
+
+AI uses two models, set as vars in `wrangler.jsonc`: `AI_MODEL_SMART` (default `claude-opus-5-5`) writes fit
+reports, answers and resume drafts; `AI_MODEL_FAST` (default `claude-haiku-5-5`) gives the email second
+opinion and re-ranks search results. Point `AI_MODEL_SMART` at a cheaper model to cut cost.
 
 ## Calendar
 
