@@ -1,1 +1,140 @@
 @import "tailwindcss";
+
+/*
+ * Resume Submission Portal design tokens.
+ * Ink on paper: a warm ledger-paper plane, white sheets, blue-black ink for actions, and a
+ * highlighter yellow reserved for one meaning only: "new since you last looked".
+ * Every color is a CSS variable, redefined for dark mode below.
+ */
+:root {
+  --paper: #f5f3ee;
+  --sheet: #ffffff;
+  --sheet-2: #faf9f6;
+  --ink: #18222f;
+  --ink-2: #47515f;
+  --muted: #747e8c;
+  --line: #e4e0d7;
+  --line-2: #d6d1c5;
+  --accent: #1f3a5f;
+  --accent-2: #2c5282;
+  --accent-ink: #ffffff;
+  --focus: #3b6fb6;
+  --highlight: #fff1a1;
+  --highlight-ink: #4a3d00;
+  --tone-neutral: #e9e6df;
+  --tone-neutral-ink: #3d4450;
+  --tone-info: #e3edf9;
+  --tone-info-ink: #1d4f8f;
+  --tone-progress: #ece6f8;
+  --tone-progress-ink: #5a3b99;
+  --tone-success: #e2f3e8;
+  --tone-success-ink: #1f6b3d;
+  --tone-danger: #fbe6e4;
+  --tone-danger-ink: #a2322a;
+  --tone-muted: #efeeeb;
+  --tone-muted-ink: #6b717b;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #11151b;
+    --sheet: #181e26;
+    --sheet-2: #1d2430;
+    --ink: #e8ecf1;
+    --ink-2: #b9c2ce;
+    --muted: #8a95a4;
+    --line: #29313c;
+    --line-2: #364050;
+    --accent: #9cc0ee;
+    --accent-2: #b8d3f5;
+    --accent-ink: #0c1626;
+    --focus: #9cc0ee;
+    --highlight: #5a4f12;
+    --highlight-ink: #fff3b0;
+    --tone-neutral: #262d38;
+    --tone-neutral-ink: #c8d0db;
+    --tone-info: #1b3150;
+    --tone-info-ink: #a9cbf5;
+    --tone-progress: #2c2346;
+    --tone-progress-ink: #cdb9f5;
+    --tone-success: #173826;
+    --tone-success-ink: #9fdcb5;
+    --tone-danger: #43201d;
+    --tone-danger-ink: #f3aaa2;
+    --tone-muted: #22272f;
+    --tone-muted-ink: #9aa3ae;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-sheet-2: var(--sheet-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-ink: var(--accent-ink);
+  --color-focus: var(--focus);
+  --color-highlight: var(--highlight);
+  --color-highlight-ink: var(--highlight-ink);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tone-neutral {
+  background: var(--tone-neutral);
+  color: var(--tone-neutral-ink);
+}
+.tone-info {
+  background: var(--tone-info);
+  color: var(--tone-info-ink);
+}
+.tone-progress {
+  background: var(--tone-progress);
+  color: var(--tone-progress-ink);
+}
+.tone-success {
+  background: var(--tone-success);
+  color: var(--tone-success-ink);
+}
+.tone-danger {
+  background: var(--tone-danger);
+  color: var(--tone-danger-ink);
+}
+.tone-muted {
+  background: var(--tone-muted);
+  color: var(--tone-muted-ink);
+}
+.tone-new {
+  background: var(--highlight);
+  color: var(--highlight-ink);
+}
+
+/* Long job descriptions keep their paragraphs. */
+.prose-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
