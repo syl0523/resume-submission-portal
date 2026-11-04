@@ -2,6 +2,8 @@ import type {
   Application,
   ApplicationEvent,
   ApplicationListItem,
+  ApplicationStatus,
+  InboxItem,
   Job,
   JobSummary,
   Profile,
@@ -12,6 +14,7 @@ import type {
 import type {
   ApplicationEventRow,
   ApplicationRow,
+  InboundEmailRow,
   JobRow,
   ProfileRow,
   ResumeRow,
@@ -201,5 +204,29 @@ export function toSearchHit(r: SearchHitRow): SearchHit {
     isNew: r.isNew,
     dismissed: r.dismissed,
     applicationId: r.applicationId,
+  };
+}
+
+export function toInboxItem(
+  r: InboundEmailRow,
+  application: { id: string; company: string; title: string; status: ApplicationStatus } | null,
+): InboxItem {
+  return {
+    id: r.id,
+    fromAddress: r.fromAddress,
+    subject: r.subject,
+    receivedAt: r.receivedAt,
+    provider: r.provider,
+    kind: r.kind,
+    company: r.company,
+    jobTitle: r.jobTitle,
+    confidence: r.confidence,
+    classifier: r.classifier,
+    status: r.status,
+    applicationId: r.applicationId,
+    application,
+    snippet: r.snippet,
+    error: r.error,
+    createdAt: r.createdAt,
   };
 }

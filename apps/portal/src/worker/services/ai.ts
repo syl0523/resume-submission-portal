@@ -1,4 +1,5 @@
-import type { AiAnswer, Profile } from '@jsp/core';
+import type { AiAnswer, EmailClassification, Profile } from '@jsp/core';
+import type { EmailMessage } from '@jsp/integrations';
 import type { ResumeRow } from '../db/schema';
 import type { Env } from '../env';
 import { HttpError } from '../lib/errors';
@@ -47,4 +48,19 @@ export async function draftProfileFromResume(
   void resume;
   void current;
   throw new HttpError(501, 'feature_disabled', 'Profile drafts are not implemented yet');
+}
+
+/**
+ * Second opinion for an email the rules are unsure about (confidence < 0.6). Returns null when it
+ * cannot do better. TODO(KAN-32).
+ */
+export async function classifyEmailWithAi(
+  env: Env,
+  message: EmailMessage,
+  rules: EmailClassification,
+): Promise<EmailClassification | null> {
+  void env;
+  void message;
+  void rules;
+  return null;
 }
