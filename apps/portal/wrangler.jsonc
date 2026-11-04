@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "resume-submission-portal",
+  "main": "./src/worker/index.ts",
+  "compatibility_date": "2026-10-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+
+  // The React app is served as static assets; /api/* always reaches the Worker.
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // Create with: wrangler d1 create job-portal  (then paste the id here)
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "job-portal",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Create with: wrangler r2 bucket create job-portal-files
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "job-portal-files" }],
+
+  // Daily at 11:00 UTC (6-7am Toronto): board sync, follow-up reminders, no-response marking.
+  "triggers": { "crons": ["0 11 * * *"] },
+
+  "vars": {
+    "APP_NAME": "Job Portal",
+    // "access" = Cloudflare Access in front of the portal (production). Local dev overrides
+    // this to "dev" in .dev.vars. The Worker refuses requests if Access is not configured.
+    "AUTH_MODE": "access",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    // Domain routed to this Worker by Cloudflare Email Routing, e.g. "jobs.example.com".
+    "INBOUND_EMAIL_DOMAIN": "",
+    "FOLLOW_UP_AFTER_DAYS": "7",
+    "GHOST_AFTER_DAYS": "21",
+    "ADZUNA_COUNTRY": "us",
+    // USAJOBS requires the email you registered the API key with as User-Agent.
+    "USAJOBS_USER_AGENT": "",
+    "JSEARCH_HOST": "jsearch.p.rapidapi.com",
+    "AI_MODEL_FAST": "claude-haiku-5-5",
+    "AI_MODEL_SMART": "claude-sonnet-5-5"
+    // Secrets (wrangler secret put ...): ANTHROPIC_API_KEY, ADZUNA_APP_ID,
+    // ADZUNA_APP_KEY, USAJOBS_API_KEY, JSEARCH_API_KEY
+  }
+}

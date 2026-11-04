@@ -1,0 +1,56 @@
+name: Deploy
+
+# Deploys the portal Worker to Cloudflare after CI passes on main.
+# Enable it once production is set up (docs/runbook.md):
+#   repo variable  CLOUDFLARE_DEPLOY = true
+#   repo secrets   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      vars.CLOUDFLARE_DEPLOY == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter @jsp/portal build
+
+      - name: Apply D1 migrations
+        working-directory: apps/portal
+        run: pnpm exec wrangler d1 migrations apply DB --remote
+
+      - name: Deploy Worker
+        working-directory: apps/portal
+        run: pnpm exec wrangler deploy

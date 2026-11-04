@@ -1,0 +1,23 @@
+{
+  "name": "@jsp/integrations",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure, runtime-agnostic integration logic: job URL analysis, email classification, import parsers, official job-board and search API clients.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jsp/core": "workspace:*",
+    "papaparse": "5.7.0"
+  },
+  "devDependencies": {
+    "@types/papaparse": "5.5.2",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}

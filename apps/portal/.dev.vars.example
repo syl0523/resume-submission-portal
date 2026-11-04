@@ -1,0 +1,12 @@
+# Local development overrides. Copied to .dev.vars on first `pnpm dev` (never commit .dev.vars).
+AUTH_MODE=dev
+DEV_USER_EMAIL=me@example.com
+INBOUND_EMAIL_DOMAIN=jobs.example.com
+
+# Optional integrations
+# ANTHROPIC_API_KEY=
+# ADZUNA_APP_ID=
+# ADZUNA_APP_KEY=
+# USAJOBS_API_KEY=
+# USAJOBS_USER_AGENT=you@example.com
+# JSEARCH_API_KEY=

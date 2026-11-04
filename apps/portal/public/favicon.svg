@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Job Portal">
+  <title>Job Portal</title>
+  <rect width="32" height="32" rx="8" fill="#1f3a5f"/>
+  <path d="M11 11V9.5A1.5 1.5 0 0 1 12.5 8h7A1.5 1.5 0 0 1 21 9.5V11h3a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 24 24H8a1.5 1.5 0 0 1-1.5-1.5v-10A1.5 1.5 0 0 1 8 11h3Zm2 0h6V10h-6v1Zm-4.5 4.5v7h15v-7h-6V17h-3v-1.5h-6Z" fill="#f4f7fb"/>
+</svg>
