@@ -70,30 +70,32 @@ export function Imports() {
               </Button>
             </div>
           </form>
-          {result ? (
-            <div className="mt-5 flex flex-col gap-3 border-t border-line pt-4 text-sm">
-              <p className="text-ink">
-                <strong>{result.created}</strong> added · <strong>{result.updated}</strong> updated
-                · <strong>{result.skipped}</strong> already up to date
-              </p>
-              {result.errors.length > 0 ? (
-                <div>
-                  <p className="font-medium text-ink">Rows that need attention</p>
-                  <ul className="mt-1 list-disc pl-5 text-ink-2">
-                    {result.errors.map((e) => (
-                      <li key={`${e.row}-${e.message}`}>
-                        {e.row > 0 ? `Row ${e.row}: ` : ''}
-                        {e.message}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              <Link to="/applications" className="text-accent hover:underline">
-                See your applications →
-              </Link>
-            </div>
-          ) : null}
+          <div role="status">
+            {result ? (
+              <div className="mt-5 flex flex-col gap-3 border-t border-line pt-4 text-sm">
+                <p className="text-ink">
+                  <strong>{result.created}</strong> added · <strong>{result.updated}</strong>{' '}
+                  updated · <strong>{result.skipped}</strong> already up to date
+                </p>
+                {result.errors.length > 0 ? (
+                  <div>
+                    <p className="font-medium text-ink">Rows that need attention</p>
+                    <ul className="mt-1 list-disc pl-5 text-ink-2">
+                      {result.errors.map((e) => (
+                        <li key={`${e.row}-${e.message}`}>
+                          {e.row > 0 ? `Row ${e.row}: ` : ''}
+                          {e.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <Link to="/applications" className="text-accent hover:underline">
+                  See your applications →
+                </Link>
+              </div>
+            ) : null}
+          </div>
         </Card>
         <Card title="Where to get the files">
           <div className="flex flex-col gap-3 text-sm text-ink-2">

@@ -443,9 +443,9 @@ function ProfileForm({ initial }: { initial: Profile }) {
         <Button type="submit" variant="primary" busy={save.isPending}>
           Save profile
         </Button>
-        {save.isSuccess ? (
-          <span className="text-sm text-[var(--tone-success-ink)]">Saved.</span>
-        ) : null}
+        <span role="status" className="text-sm text-[var(--tone-success-ink)]">
+          {save.isSuccess ? 'Saved.' : ''}
+        </span>
         {initial.updatedAt ? (
           <span className="text-xs text-muted">Last saved {relativeDay(initial.updatedAt)}</span>
         ) : null}

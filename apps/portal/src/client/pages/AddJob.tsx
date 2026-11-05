@@ -108,22 +108,29 @@ export function AddJob() {
             </Button>
           </form>
           <ErrorNote error={resolve.error} className="mt-3" />
-          {resolved?.message ? <p className="mt-3 text-sm text-ink-2">{resolved.message}</p> : null}
-          {resolved?.fetched ? (
-            <p className="mt-3 text-sm text-[var(--tone-success-ink)]">
-              Details filled in from the employer's job board.
-            </p>
-          ) : null}
+          {/* Live region: screen readers hear what the lookup found without moving focus. */}
+          <div role="status">
+            {resolved?.message ? (
+              <p className="mt-3 text-sm text-ink-2">{resolved.message}</p>
+            ) : null}
+            {resolved?.fetched ? (
+              <p className="mt-3 text-sm text-[var(--tone-success-ink)]">
+                Details filled in from the employer's job board. Check them below.
+              </p>
+            ) : null}
+          </div>
         </Card>
 
-        {duplicateId ? (
-          <div className="tone-info rounded-md px-4 py-3 text-sm">
-            You already saved this job.{' '}
-            <Link to={`/applications/${duplicateId}`} className="font-medium underline">
-              Open it
-            </Link>
-          </div>
-        ) : null}
+        <div role="status">
+          {duplicateId ? (
+            <div className="tone-info rounded-md px-4 py-3 text-sm">
+              You already saved this job.{' '}
+              <Link to={`/applications/${duplicateId}`} className="font-medium underline">
+                Open it
+              </Link>
+            </div>
+          ) : null}
+        </div>
 
         <form
           className="flex flex-col gap-5"
@@ -218,7 +225,17 @@ export function AddJob() {
             >
               Save application
             </Button>
-            <Button onClick={() => navigate(-1)}>Cancel</Button>
+            <Button
+              onClick={() =>
+                // Opened directly (bookmark, extension, new tab): there is no earlier page in this
+                // app to go back to, so go to the list instead of leaving the portal.
+                (window.history.state as { idx?: number } | null)?.idx
+                  ? navigate(-1)
+                  : navigate('/applications')
+              }
+            >
+              Cancel
+            </Button>
           </div>
         </form>
       </div>
