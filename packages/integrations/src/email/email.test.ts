@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { classifyEmail, normalizeEmailDate, parseInterviewTime, unwrapForwarded } from './index';
+import {
+  classifyEmail,
+  normalizeEmailDate,
+  parseAddress,
+  parseInterviewTime,
+  unwrapForwarded,
+} from './index';
 import type { EmailMessage } from './types';
 
 // All fixtures are synthetic: fictional companies, example.com people, made-up job ids.
@@ -337,5 +343,40 @@ describe('dates and interview times', () => {
   it('gives up without a date or a zone', () => {
     expect(parseInterviewTime('Friday at 3pm works')).toBeNull();
     expect(parseInterviewTime('November 12 at 2:00 PM')).toBeNull();
+  });
+});
+
+describe('parseAddress', () => {
+  it('splits display names and addresses', () => {
+    expect(parseAddress('"LinkedIn" <jobs-noreply@LinkedIn.com>')).toEqual({
+      name: 'LinkedIn',
+      address: 'jobs-noreply@linkedin.com',
+    });
+    expect(parseAddress('Jane Recruiter <jane@acme.example>')).toEqual({
+      name: 'Jane Recruiter',
+      address: 'jane@acme.example',
+    });
+    expect(parseAddress('“Acme Talent” <talent@acme.example>')).toEqual({
+      name: 'Acme Talent',
+      address: 'talent@acme.example',
+    });
+    expect(parseAddress('<no-reply@greenhouse.io>')).toEqual({
+      name: null,
+      address: 'no-reply@greenhouse.io',
+    });
+    expect(parseAddress('  HR@acme.example ')).toEqual({ name: null, address: 'hr@acme.example' });
+    expect(parseAddress('Jobs at Acme hr@acme.example')).toEqual({
+      name: null,
+      address: 'hr@acme.example',
+    });
+  });
+
+  it('stays fast on padded or junk From values (anyone can send the portal an email)', () => {
+    const started = performance.now();
+    parseAddress(`${' '.repeat(100_000)}x`);
+    parseAddress(`a${' '.repeat(100_000)}b <c`);
+    parseAddress(`${'"'.repeat(100_000)}<`);
+    parseAddress('a'.repeat(100_000));
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 });

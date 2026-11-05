@@ -54,6 +54,23 @@ describe('htmlToText', () => {
     );
   });
 
+  it('drops hidden elements, keeps <header> text and does not bullet <link>', () => {
+    expect(
+      htmlToText(
+        '<HEAD><title>t</title></HEAD><SCRIPT type="x">bad()</SCRIPT ><header>Acme</header><link rel="x"><p>Hi</p>',
+      ),
+    ).toBe('Acme Hi');
+  });
+
+  it('stays linear on broken or hostile HTML', () => {
+    const started = performance.now();
+    htmlToText('<'.repeat(200_000));
+    htmlToText('<script>'.repeat(25_000));
+    htmlToText('<style x'.repeat(25_000));
+    htmlToText('<li'.repeat(50_000));
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   it('decodes numeric entities', () => {
     expect(decodeEntities('caf&#233; &#x2014; ok')).toBe('café — ok');
   });

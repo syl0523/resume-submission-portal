@@ -117,16 +117,44 @@ export function decodeEntities(input: string): string {
 }
 
 /**
+ * Remove script, style, head and noscript elements in one pass. A tag with no closing tag after it
+ * is left for the generic tag stripper, and is remembered, so later unclosed tags of the same kind
+ * do not each search to the end of the document again.
+ */
+function dropHiddenElements(html: string): string {
+  const open = /<(script|style|head|noscript)\b[^<>]*>/gi;
+  const unclosed = new Set<string>();
+  let out = '';
+  let from = 0;
+  for (let m = open.exec(html); m; m = open.exec(html)) {
+    const tag = (m[1] ?? '').toLowerCase();
+    if (unclosed.has(tag)) continue;
+    const close = new RegExp(`</${tag}\\b[^<>]*>`, 'gi');
+    close.lastIndex = open.lastIndex;
+    const end = close.exec(html);
+    if (!end) {
+      unclosed.add(tag);
+      continue;
+    }
+    out += `${html.slice(from, m.index)} `;
+    from = end.index + end[0].length;
+    open.lastIndex = from;
+  }
+  return out + html.slice(from);
+}
+
+/**
  * Readable plain text from an HTML fragment. For entity-encoded HTML (Greenhouse `content`),
  * call `htmlToText(decodeEntities(content))`.
  */
 export function htmlToText(html: string): string {
-  const stripped = html
-    .replace(/<(script|style|head|noscript)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+  // Tag patterns stop at the next "<" as well as ">": with `[^>]*`, text full of "<" and no ">"
+  // (broken or hostile email HTML) is rescanned from every "<", which is quadratic.
+  const stripped = dropHiddenElements(html)
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<li\b[^<>]*>/gi, '\n• ')
     .replace(/<\/(p|div|h[1-6]|tr|section|article|ul|ol|table|blockquote)>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ');
+    .replace(/<[^<>]+>/g, ' ');
   return decodeEntities(stripped)
     .replace(/[ \t\f\v ]+/g, ' ')
     .replace(/ *\n */g, '\n')

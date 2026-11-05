@@ -1,15 +1,32 @@
 import { htmlToText } from '../text';
 import type { EmailAddress, EmailMessage } from './types';
 
-/** Parse `"Name" <addr@host>` or `addr@host` into its parts. Address is lower-cased. */
+/**
+ * Parse `"Name" <addr@host>` or `addr@host` into its parts. Address is lower-cased.
+ * Index scans instead of one big regex: the From header comes from whoever sends the email, and
+ * a padded value must not cost more than a quick pass.
+ */
 export function parseAddress(from: string): EmailAddress {
-  const angle = /^\s*["“']?([^"“”<]*?)["”']?\s*<([^>]+)>\s*$/.exec(from);
-  if (angle?.[2]) {
-    const name = angle[1]?.trim() || null;
-    return { name, address: angle[2].trim().toLowerCase() };
+  // Real From values are short; anything past the first 1,000 characters is junk.
+  const value = from.slice(0, 1000).trim();
+  const open = value.lastIndexOf('<');
+  const close = open >= 0 ? value.indexOf('>', open + 1) : -1;
+  if (close > open && !value.slice(close + 1).trim()) {
+    const address = value
+      .slice(open + 1, close)
+      .trim()
+      .toLowerCase();
+    if (address) {
+      const name = value
+        .slice(0, open)
+        .trim()
+        .replace(/^["“']+/, '')
+        .replace(/["”']+$/, '');
+      return { name: name.trim() || null, address };
+    }
   }
-  const bare = /[^\s<>"]+@[^\s<>"]+/.exec(from)?.[0];
-  return { name: null, address: (bare ?? from).trim().toLowerCase() };
+  const bare = /[^\s<>"]+@[^\s<>"]+/.exec(value)?.[0];
+  return { name: null, address: (bare ?? value).toLowerCase() };
 }
 
 /** Best plain-text body: the text part, else the HTML part converted to text. */
