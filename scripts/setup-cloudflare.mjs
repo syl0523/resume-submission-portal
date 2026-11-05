@@ -82,7 +82,7 @@ async function ask(rl, question) {
 }
 
 async function main() {
-  say('Resume Submission Portal: Cloudflare setup' + (DRY_RUN ? ' (dry run)' : ''));
+  say(`Resume Submission Portal: Cloudflare setup${DRY_RUN ? ' (dry run)' : ''}`);
   const rl = createInterface({ input: process.stdin, output: process.stdout });
 
   step('Checking your Cloudflare sign-in');
