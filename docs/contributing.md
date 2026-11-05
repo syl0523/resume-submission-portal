@@ -19,6 +19,10 @@ PRs that mention a Jira key then appear on the issue's Development panel automat
 4. Open a PR titled `KAN-<n> <summary>`; fill the template; CI must be green.
 5. Squash-merge; move the Jira task to **Done**; update the Confluence page if behaviour changed.
 
+While the owner is the only developer, changes are committed straight to `main` instead (still with the
+key in the message, `pnpm check` green first). CI runs on every push, and a green CI on `main` deploys.
+Pull requests remain the way in for Dependabot and anyone else.
+
 ## Multi-agent development
 
 The first version was built by an orchestrator agent and four build agents working in parallel:

@@ -174,19 +174,19 @@ active applications with no activity for `GHOST_AFTER_DAYS` (default 21) as `gho
 A saved search is a named track ("HR Manager, remote US") with criteria drafted from a resume. Each run
 stores its postings as hits, so the portal can show what is new.
 
-| Method & path                            | Body / query             | Response                                                                                      |
-| ---------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------- |
-| `GET /api/searches`                      | –                        | `SavedSearch[]`                                                                               |
-| `POST /api/searches`                     | `SavedSearchRequest`     | 201 `SavedSearch`                                                                             |
-| `POST /api/searches/draft-from-resume`   | `DraftFromResumeRequest` | `SavedSearchDraft`, **not saved** (501 without AI; 422 when the resume has no usable content) |
-| `GET /api/searches/:id`                  | –                        | `SavedSearch`                                                                                 |
-| `PUT /api/searches/:id`                  | `SavedSearchRequest`     | `SavedSearch`                                                                                 |
-| `DELETE /api/searches/:id`               | –                        | 204 (hits go with it)                                                                         |
-| `POST /api/searches/:id/run`             | `RunSearchRequest`       | `RunSearchResponse`                                                                           |
-| `GET /api/searches/:id/hits`             | `ListHitsQuery`          | `ListResponse<SearchHit>`                                                                     |
-| `GET /api/searches/:id/links`            | –                        | `DeepLinkGroup[]` (pre-filled LinkedIn / Indeed / Google Jobs searches)                       |
-| `POST /api/searches/hits/:hitId/save`    | `SaveHitRequest`         | 201 `ApplicationDetail` (`capturedVia: "search"`, `fitScore` from the hit)                    |
-| `POST /api/searches/hits/:hitId/dismiss` | –                        | 204                                                                                           |
+| Method & path                            | Body / query             | Response                                                                                                                                     |
+| ---------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/searches`                      | –                        | `SavedSearch[]`                                                                                                                              |
+| `POST /api/searches`                     | `SavedSearchRequest`     | 201 `SavedSearch`                                                                                                                            |
+| `POST /api/searches/draft-from-resume`   | `DraftFromResumeRequest` | `SavedSearchDraft`, **not saved** (501 without AI; 422 when the resume has no usable content)                                                |
+| `GET /api/searches/:id`                  | –                        | `SavedSearch`                                                                                                                                |
+| `PUT /api/searches/:id`                  | `SavedSearchRequest`     | `SavedSearch`                                                                                                                                |
+| `DELETE /api/searches/:id`               | –                        | 204 (hits go with it)                                                                                                                        |
+| `POST /api/searches/:id/run`             | `RunSearchRequest`       | `RunSearchResponse`                                                                                                                          |
+| `GET /api/searches/:id/hits`             | `ListHitsQuery`          | `ListResponse<SearchHit>`                                                                                                                    |
+| `GET /api/searches/:id/links`            | –                        | `DeepLinkGroup[]` (pre-filled LinkedIn / Indeed / Google Jobs searches)                                                                      |
+| `POST /api/searches/hits/:hitId/save`    | `SaveHitRequest`         | 201 `ApplicationDetail` (`capturedVia: "search"`, `fitScore` from the hit; 200 with the existing application when the job was already saved) |
+| `POST /api/searches/hits/:hitId/dismiss` | –                        | 204                                                                                                                                          |
 
 How a run works (`POST /api/searches/:id/run`):
 

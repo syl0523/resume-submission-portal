@@ -189,17 +189,19 @@ Built in v1 (this release):
 
 Next (Jira epic "Phase 2"):
 
-| Feature                                                         | Why                                                                                        |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Workday and iCIMS autofill                                      | Most common enterprise ATSs in the US; longest forms                                       |
-| Referral finder (LinkedIn Connections.csv from the data export) | "You know 2 people at Acme": referrals beat cold applications                              |
-| Tailored resume file per job (DOCX/PDF)                         | One-click truthful tailoring of bullets and summary to the posting                         |
-| Follow-up email drafts                                          | Turn due follow-ups into a ready-to-send note                                              |
-| Interview prep                                                  | Likely questions and STAR stories from the posting and your history                        |
-| Offer comparison                                                | Base, bonus, equity, benefits, remote, cost of living side by side                         |
-| Daily email digest                                              | New hits and due follow-ups each morning (Email Routing can send to your verified address) |
-| Company insights                                                | H-1B/LCA sponsorship history (public DOL data), size, recent news                          |
-| Background jobs on Queues/Workflows                             | Retries and no request-path limits for search runs, digests and imports                    |
-| Playwright end-to-end tests in CI                               | Catch UI regressions across the main flows                                                 |
-| Direct mailbox connection (Graph, Gmail)                        | Alternative to forwarding rules                                                            |
-| PWA + bilingual (English/Chinese) UI                            | Phone use; Chinese-language interface                                                      |
+| Feature                                                                     | Why                                                                                        |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Workday and iCIMS autofill                                                  | Most common enterprise ATSs in the US; longest forms                                       |
+| Referral finder (LinkedIn Connections.csv from the data export)             | "You know 2 people at Acme": referrals beat cold applications                              |
+| Tailored resume file per job (DOCX/PDF)                                     | One-click truthful tailoring of bullets and summary to the posting                         |
+| Follow-up email drafts                                                      | Turn due follow-ups into a ready-to-send note                                              |
+| Interview prep                                                              | Likely questions and STAR stories from the posting and your history                        |
+| Offer comparison                                                            | Base, bonus, equity, benefits, remote, cost of living side by side                         |
+| Daily email digest                                                          | New hits and due follow-ups each morning (Email Routing can send to your verified address) |
+| Company insights                                                            | H-1B/LCA sponsorship history (public DOL data), size, recent news                          |
+| Background jobs on Queues/Workflows                                         | Retries and no request-path limits for search runs, digests and imports                    |
+| Playwright end-to-end tests in CI                                           | Catch UI regressions across the main flows                                                 |
+| Direct mailbox connection (Graph, Gmail)                                    | Alternative to forwarding rules                                                            |
+| PWA + bilingual (English/Chinese) UI                                        | Phone use; Chinese-language interface                                                      |
+| Web search source for Job Match (Claude web search on company career pages) | Finds openings that the search APIs miss, as the first smoke run did by hand               |
+| Demo mode (fictional data, no backend)                                      | Show the portal to others without signing in                                               |
