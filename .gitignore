@@ -10,3 +10,6 @@ coverage/
 .DS_Store
 *.zip
 .vite/
+
+# Agent worktrees (separate checkouts of in-progress branches)
+.claude/worktrees/
