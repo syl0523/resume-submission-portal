@@ -16,6 +16,12 @@ Local mode signs you in as `DEV_USER_EMAIL` (localhost only). Optional keys go i
 
 ## Production on Cloudflare
 
+**Fastest path:** `pnpm setup:cloudflare`. It signs you in to Cloudflare, creates the D1 database and R2
+bucket (writing the database id into `wrangler.jsonc`), offers to set each API key, then builds and deploys.
+It reuses anything that already exists, so it is safe to re-run (for example after filling in the Access
+settings). `pnpm setup:cloudflare --dry-run` shows what it would do. Then finish steps 6 to 9 below in the
+Cloudflare dashboard; the manual equivalents of steps 2 to 5 are kept for reference.
+
 1. **Plan.** Workers Paid ($5/month) is recommended: the free plan's 10 ms CPU per request is too tight for
    email parsing and ranking.
 2. **Sign in.** `cd apps/portal && pnpm exec wrangler login`
