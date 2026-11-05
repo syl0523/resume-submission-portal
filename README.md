@@ -31,7 +31,7 @@ Phase 1 runs end to end locally (`pnpm dev`); deploying it to Cloudflare is next
 | AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                                       |
 | Web app                                                                | Done                                                                       |
 | Chrome extension                                                       | Paused: pairing and autofill planner built, popup not yet (KAN-30, 31, 43) |
-| Production on Cloudflare                                               | Next (KAN-34)                                                              |
+| Production on Cloudflare                                               | In progress (KAN-34): database created; file storage and deploy pending    |
 
 Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/JSP/pages/393219)
 is in Confluence.

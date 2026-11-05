@@ -18,7 +18,7 @@
     {
       "binding": "DB",
       "database_name": "resume-submission-portal",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "c5065ceb-044f-4de5-9418-385a634469f5",
       "migrations_dir": "migrations"
     }
   ],
