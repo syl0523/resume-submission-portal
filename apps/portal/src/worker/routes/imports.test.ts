@@ -116,4 +116,14 @@ describe('imports API', () => {
     const json = await t.json<ApiErrorBody>('/api/imports', jsonBody('POST', { csv: TRACKER }));
     expect(json.status).toBe(415);
   });
+
+  it('answers 400 for a malformed upload', async () => {
+    const bad = await t.json<ApiErrorBody>('/api/imports', {
+      method: 'POST',
+      headers: { 'content-type': 'multipart/form-data; boundary=----portal-test' },
+      body: 'this is not a multipart body',
+    });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('invalid_request');
+  });
 });

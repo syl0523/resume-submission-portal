@@ -10,8 +10,9 @@ import { newId } from '../lib/crypto';
 import { HttpError } from '../lib/errors';
 import { toResume } from '../lib/mappers';
 import { nowIso } from '../lib/time';
-import { validate } from '../lib/validate';
+import { readMultipart, validate } from '../lib/validate';
 import {
+  clipChars,
   getResumeRow,
   listResumes,
   MAX_RESUME_BYTES,
@@ -49,7 +50,7 @@ resumeRoutes.post('/', async (c) => {
   // Refuse obviously oversized bodies before reading them (multipart adds a little overhead).
   if (Number(c.req.header('content-length') ?? 0) > MAX_RESUME_BYTES + 256 * 1024) throw tooLarge();
 
-  const form = await c.req.parseBody();
+  const form = await readMultipart(c);
   const file = form.file;
   if (!(file instanceof File)) {
     throw new HttpError(400, 'invalid_request', 'Attach the resume file as "file"');
@@ -59,11 +60,13 @@ resumeRoutes.post('/', async (c) => {
 
   const fileName = safeFileName(file.name);
   const mimeType = resumeMimeType(fileName, file.type);
-  const label =
-    (typeof form.label === 'string' ? form.label.trim() : '') || fileName.replace(/\.[^.]+$/, '');
-  if (label.length > MAX_LABEL) {
+  const typedLabel = typeof form.label === 'string' ? form.label.trim() : '';
+  if (typedLabel.length > MAX_LABEL) {
     throw new HttpError(400, 'invalid_request', `The label can be at most ${MAX_LABEL} characters`);
   }
+  // Without a label, name it after the file, trimmed to fit.
+  const label =
+    typedLabel || clipChars(fileName.replace(/\.[^.]+$/, ''), MAX_LABEL).trim() || 'Resume';
   const text = typeof form.text === 'string' && form.text.trim() ? form.text : null;
   if (text && text.length > MAX_TEXT) {
     throw new HttpError(400, 'invalid_request', 'The resume text is too long');

@@ -11,13 +11,13 @@ export type IcsEvent =
     }
   | { uid: string; summary: string; description?: string; url?: string; date: string };
 
-/** Escape TEXT values: backslash, semicolon, comma and line breaks. */
+/** Escape TEXT values: backslash, semicolon, comma and line breaks (CRLF, LF or a lone CR). */
 export function icsText(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
+    .replace(/\r\n|\r|\n/g, '\\n');
 }
 
 /** Fold content lines longer than 75 octets (UTF-8), never splitting a character. */

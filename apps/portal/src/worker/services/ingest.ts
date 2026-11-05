@@ -26,6 +26,7 @@ import type { Db } from '../db/client';
 import { applications, type InboundEmailRow, inboundEmails, jobs } from '../db/schema';
 import type { AuthUser, Env } from '../env';
 import { newId } from '../lib/crypto';
+import { describeError, errorSummary } from '../lib/errors';
 import { toInboxItem } from '../lib/mappers';
 import { nowIso, toIso } from '../lib/time';
 import { aiEnabled, classifyEmailWithAi } from './ai';
@@ -254,7 +255,7 @@ export async function ingestEmail(
         classifier = 'ai';
       }
     } catch (err) {
-      console.warn('AI email classification failed', err);
+      console.warn('AI email classification failed', describeError(err));
     }
   }
 
@@ -267,7 +268,7 @@ export async function ingestEmail(
       await env.FILES.put(key, input.raw, { httpMetadata: { contentType: 'message/rfc822' } });
       storedKey = key;
     } catch (err) {
-      console.warn('Could not store the raw email', err);
+      console.warn('Could not store the raw email', describeError(err));
     }
   }
 
@@ -358,13 +359,13 @@ export async function ingestEmail(
     }
     await db.update(inboundEmails).set({ status, applicationId }).where(eq(inboundEmails.id, id));
   } catch (err) {
-    console.error('Email ingest failed', err);
+    console.error('Email ingest failed', describeError(err));
     await db
       .update(inboundEmails)
       .set({
         status: 'error',
         applicationId,
-        error: truncate(err instanceof Error ? err.message : String(err), 500),
+        error: errorSummary(err),
       })
       .where(eq(inboundEmails.id, id));
     return { item: await getInboxItem(db, userId, id), applicationId, created, statusChanged };

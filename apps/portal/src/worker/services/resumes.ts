@@ -50,7 +50,23 @@ export function safeFileName(name: string): string {
     .replace(/[\u0000-\u001f\u007f"<>|:*?]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return (cleaned || 'resume').slice(-150);
+  return clipChars(cleaned || 'resume', 150, true);
+}
+
+/** Clip to `max` UTF-16 units without splitting a character; `fromEnd` keeps the tail. */
+export function clipChars(text: string, max: number, fromEnd = false): string {
+  if (text.length <= max) return text;
+  const chars = Array.from(text);
+  if (fromEnd) chars.reverse();
+  const kept: string[] = [];
+  let size = 0;
+  for (const ch of chars) {
+    if (size + ch.length > max) break;
+    kept.push(ch);
+    size += ch.length;
+  }
+  if (fromEnd) kept.reverse();
+  return kept.join('');
 }
 
 export function resumeKey(userId: string, resumeId: string, fileName: string): string {

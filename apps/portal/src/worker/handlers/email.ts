@@ -1,5 +1,6 @@
 import { createDb } from '../db/client';
 import type { Env } from '../env';
+import { describeError } from '../lib/errors';
 import { nowIso } from '../lib/time';
 import { ingestEmail } from '../services/ingest';
 import { parseRawEmail } from '../services/mime';
@@ -45,6 +46,6 @@ export async function handleEmail(
       raw,
     });
   } catch (err) {
-    console.error('Inbound email could not be processed', err);
+    console.error('Inbound email could not be processed', describeError(err));
   }
 }

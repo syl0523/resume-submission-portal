@@ -3,6 +3,7 @@ import { parseImportCsv } from '@jsp/integrations';
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { HttpError } from '../lib/errors';
+import { readMultipart } from '../lib/validate';
 import { importApplications } from '../services/imports';
 
 /** LinkedIn data export / tracker CSV import (KAN-23). Mounted at /api/imports. */
@@ -22,7 +23,7 @@ export const importRoutes = new Hono<AppEnv>().post('/', async (c) => {
   if (Number(c.req.header('content-length') ?? 0) > MAX_CSV_BYTES + 64 * 1024) {
     throw new HttpError(413, 'payload_too_large', 'CSV files can be at most 2 MB');
   }
-  const form = await c.req.parseBody();
+  const form = await readMultipart(c);
   const file = form.file;
   if (!(file instanceof File))
     throw new HttpError(400, 'invalid_request', 'Attach the CSV file as "file"');

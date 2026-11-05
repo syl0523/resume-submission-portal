@@ -4,6 +4,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import { createDb, type Db } from '../db/client';
 import { applications, watchedBoards } from '../db/schema';
 import { type Env, numberVar } from '../env';
+import { describeError } from '../lib/errors';
 import { addDays } from '../lib/time';
 import { buildTransitionStatements } from './applications';
 import { syncBoard } from './boards';
@@ -93,14 +94,14 @@ export async function runDailyJobs(
       report.boardsSynced += 1;
     } catch (err) {
       report.boardErrors += 1;
-      console.warn(`Board ${board.provider}/${board.token} failed to sync`, err);
+      console.warn(`Board ${board.provider}/${board.token} failed to sync`, describeError(err));
     }
   }
 
   try {
     report.ghosted = await markGhosted(db, env, now);
   } catch (err) {
-    console.error('No-response marking failed', err);
+    console.error('No-response marking failed', describeError(err));
   }
 
   if (refreshSearches) {
@@ -109,7 +110,7 @@ export async function runDailyJobs(
       report.searchesRun = searches.run;
       report.searchErrors = searches.errors;
     } catch (err) {
-      console.error('Saved-search refresh failed', err);
+      console.error('Saved-search refresh failed', describeError(err));
     }
   }
   return report;

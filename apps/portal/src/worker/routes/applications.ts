@@ -22,7 +22,7 @@ import { Hono } from 'hono';
 import type { z } from 'zod';
 import { type Db, runBatch } from '../db/client';
 import { applications, jobs } from '../db/schema';
-import type { AppEnv } from '../env';
+import { type AppEnv, outboundFetch } from '../env';
 import { toCsv } from '../lib/csv';
 import { HttpError, notFound } from '../lib/errors';
 import { toListItem } from '../lib/mappers';
@@ -276,7 +276,10 @@ applicationRoutes.post('/resolve-url', validate('json', resolveUrlSchema), async
     return c.json(body);
   }
   try {
-    const draft = await fetchJobFromUrl(info.url, { signal: AbortSignal.timeout(10_000) });
+    const draft = await fetchJobFromUrl(info.url, {
+      fetch: outboundFetch(c.env),
+      signal: AbortSignal.timeout(10_000),
+    });
     if (draft) {
       body.job = { ...base, ...draft, url: draft.url ?? info.url };
       body.fetched = true;

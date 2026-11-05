@@ -1,7 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
-import type { ValidationTargets } from 'hono';
+import type { Context, ValidationTargets } from 'hono';
 import type { ZodType } from 'zod';
-import { errorBody } from './errors';
+import { errorBody, HttpError } from './errors';
 
 /**
  * `zValidator` with the portal's error shape:
@@ -18,4 +18,17 @@ export function validate<Target extends keyof ValidationTargets, Schema extends 
       return c.json(errorBody('invalid_request', 'Invalid request', result.error.issues), 400);
     }
   });
+}
+
+/** `c.req.parseBody()`, answering 400 instead of 500 when the multipart body is malformed. */
+export async function readMultipart(c: Context) {
+  try {
+    return await c.req.parseBody();
+  } catch {
+    throw new HttpError(
+      400,
+      'invalid_request',
+      'The upload could not be read. Choose the file again and retry.',
+    );
+  }
 }

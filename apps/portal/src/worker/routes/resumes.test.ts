@@ -190,4 +190,31 @@ describe('resumes API', () => {
     const gone = await t.fetch(`/api/resumes/${unused?.id}/file`);
     expect(gone.status).toBe(404);
   });
+
+  it('answers 400 for a malformed upload and names long files without breaking characters', async () => {
+    const bad = await t.json<ApiErrorBody>('/api/resumes', {
+      method: 'POST',
+      headers: { 'content-type': 'multipart/form-data; boundary=----portal-test' },
+      body: 'this is not a multipart body',
+    });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe('invalid_request');
+
+    // No label typed: the label comes from the file name and must fit, emoji intact.
+    const name = `${'😀'.repeat(99)} resume.pdf`;
+    const { status, body } = await t.json<Resume>(
+      '/api/resumes',
+      upload(new File([PDF_BYTES], name, { type: 'application/pdf' })),
+    );
+    expect(status).toBe(201);
+    const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+    expect(body.fileName.length).toBeLessThanOrEqual(150);
+    expect(body.fileName.endsWith(' resume.pdf')).toBe(true);
+    expect(body.fileName).not.toMatch(loneSurrogate);
+    expect(body.label.length).toBeLessThanOrEqual(120);
+    expect(body.label).not.toMatch(loneSurrogate);
+    const file = await t.fetch(`/api/resumes/${body.id}/file`);
+    expect(file.status).toBe(200);
+    await file.arrayBuffer();
+  });
 });

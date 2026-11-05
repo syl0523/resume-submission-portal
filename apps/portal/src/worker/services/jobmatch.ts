@@ -20,6 +20,7 @@ import { chunk, type Db, runBatch } from '../db/client';
 import { type SavedSearchRow, savedSearches, searchHits } from '../db/schema';
 import type { Env } from '../env';
 import { newId } from '../lib/crypto';
+import { describeError } from '../lib/errors';
 import { toSearchHit } from '../lib/mappers';
 import { aiEnabled, rerankHits } from './ai';
 import { applicationIndex, fanOut } from './search';
@@ -81,7 +82,7 @@ export async function runSavedSearch(
         item.aiFit = reranked[i] ?? null;
       });
     } catch (err) {
-      console.warn('AI re-rank failed', err);
+      console.warn('AI re-rank failed', describeError(err));
     }
   }
 
@@ -200,7 +201,7 @@ export async function refreshAlertSearches(
       run += 1;
     } catch (err) {
       errors += 1;
-      console.warn(`Saved search ${search.id} failed`, err);
+      console.warn(`Saved search ${search.id} failed`, describeError(err));
     }
   }
   return { run, errors };

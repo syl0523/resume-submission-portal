@@ -12,6 +12,27 @@ import { createTestContext, jsonBody, type TestContext } from '../test/harness';
 
 const OTHER_USER = { 'x-dev-user': 'other@example.com' };
 
+const GH = 'https://boards-api.greenhouse.io/v1/boards';
+/** Greenhouse's public board API served from memory, so these tests never touch the network. */
+const outboundCalls: string[] = [];
+const fakeFetch = (async (input: RequestInfo | URL) => {
+  const url = input instanceof Request ? input.url : String(input);
+  outboundCalls.push(url);
+  const path = url.split('?')[0];
+  if (path === `${GH}/northwind/jobs/4002`) {
+    return Response.json({
+      id: 4002,
+      title: 'Benefits Specialist',
+      absolute_url: 'https://job-boards.greenhouse.io/northwind/jobs/4002',
+      location: { name: 'Remote - US' },
+      content: '&lt;p&gt;Run open enrollment.&lt;/p&gt;',
+      first_published: '2026-10-30T12:00:00Z',
+    });
+  }
+  if (path === `${GH}/northwind`) return Response.json({ name: 'Northwind Freight' });
+  return new Response('Not found', { status: 404 });
+}) as typeof fetch;
+
 const request = (over: Partial<CreateApplicationRequest> = {}): CreateApplicationRequest => ({
   job: {
     title: 'HR Generalist',
@@ -32,7 +53,7 @@ describe('applications API', () => {
     t.json<ListResponse<ApplicationListItem>>(`/api/applications${qs}`, { headers });
 
   beforeAll(async () => {
-    t = await createTestContext();
+    t = await createTestContext({ OUTBOUND_FETCH: fakeFetch });
   });
 
   afterAll(async () => {
@@ -311,6 +332,30 @@ describe('applications API', () => {
     );
     const northwind = (await list('?q=Northwind')).body.items[0];
     expect(saved.body.existingApplicationId).toBe(northwind?.id);
+  });
+
+  it('reads public ATS postings through the outbound fetch seam', async () => {
+    outboundCalls.length = 0;
+    const { status, body } = await t.json<ResolveUrlResponse>(
+      '/api/applications/resolve-url',
+      jsonBody('POST', { url: 'https://job-boards.greenhouse.io/northwind/jobs/4002?gh_src=x' }),
+    );
+    expect(status).toBe(200);
+    expect(body.fetched).toBe(true);
+    expect(body.job).toMatchObject({
+      title: 'Benefits Specialist',
+      company: 'Northwind Freight',
+      url: 'https://job-boards.greenhouse.io/northwind/jobs/4002',
+      location: 'Remote - US',
+    });
+    expect(outboundCalls.some((u) => u.startsWith(`${GH}/northwind/jobs/4002`))).toBe(true);
+
+    const missing = await t.json<ResolveUrlResponse>(
+      '/api/applications/resolve-url',
+      jsonBody('POST', { url: 'https://job-boards.greenhouse.io/northwind/jobs/9999' }),
+    );
+    expect(missing.body.fetched).toBe(false);
+    expect(missing.body.message).toContain('Fill them in here');
   });
 
   it('deletes the application, its job and its timeline', async () => {
