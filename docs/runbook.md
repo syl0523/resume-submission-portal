@@ -83,13 +83,15 @@ trackers work too: export as CSV with Company, Title, URL, Date Applied, Status,
 
 ## Install the browser extension
 
-Not ready yet: pairing (the options page) and the autofill script are built, but the toolbar popup that
-saves a job and starts autofill is still a placeholder (KAN-30). Until it lands you can pair the extension,
-not use it.
-
 Download `resume-portal-extension` from the latest CI run (or `pnpm --filter @jsp/extension build`), unzip,
 open `chrome://extensions`, enable Developer mode → **Load unpacked** → the folder (`apps/extension/dist`).
 Open the extension's options: the portal address plus a token from Settings → Browser extension.
+
+Click the toolbar icon on a job posting to save it with its fit to your saved searches, tick **I applied** to
+record the application and the resume you sent, or draft an answer to an application question with AI. On
+Greenhouse, Lever and Ashby application forms, **Autofill for review** fills what your profile knows and
+attaches a resume; you check everything and submit yourself. The extension reads a page only when you click
+it, and never autofills LinkedIn or Indeed.
 
 ## API keys
 

@@ -72,6 +72,17 @@ export async function extApi<T>(
   return (await res.json()) as T;
 }
 
+/** A binary download from the extension API (resume files for autofill). */
+export async function extFile(settings: Settings, path: string): Promise<Blob> {
+  const res = await fetch(`${settings.portalUrl}/api/ext${path}`, {
+    headers: { authorization: `Bearer ${settings.token}` },
+  });
+  if (!res.ok) {
+    throw new ExtApiError(res.status, 'http_error', `Could not download the file (${res.status})`);
+  }
+  return res.blob();
+}
+
 type Child = Node | string | null | undefined | false;
 
 /** Minimal element builder: h('button', { class: 'primary', onclick }, 'Save'). */

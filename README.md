@@ -22,16 +22,16 @@ stands, without handing your LinkedIn or Indeed account to a bot.
 
 Phase 1 runs end to end locally (`pnpm dev`); deploying it to Cloudflare is next. As of November 2026:
 
-| Area                                                                   | State                                                                      |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| API, data model and status engine                                      | Done                                                                       |
-| Email forwarding and automatic tracking                                | Done                                                                       |
-| CSV and LinkedIn import, company boards, daily cron, calendar feed     | Done                                                                       |
-| Job Match: saved searches, fit scoring, duplicate merging, Discover    | Done                                                                       |
-| AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                                       |
-| Web app                                                                | Done                                                                       |
-| Chrome extension                                                       | Paused: pairing and autofill planner built, popup not yet (KAN-30, 31, 43) |
-| Production on Cloudflare                                               | In progress (KAN-34): database created; file storage and deploy pending    |
+| Area                                                                   | State                                                                   |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| API, data model and status engine                                      | Done                                                                    |
+| Email forwarding and automatic tracking                                | Done                                                                    |
+| CSV and LinkedIn import, company boards, daily cron, calendar feed     | Done                                                                    |
+| Job Match: saved searches, fit scoring, duplicate merging, Discover    | Done                                                                    |
+| AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                                    |
+| Web app                                                                | Done                                                                    |
+| Chrome extension: save with fit, mark applied, autofill, AI answers    | Done; Chrome Web Store listing later (KAN-36)                           |
+| Production on Cloudflare                                               | In progress (KAN-34): database created; file storage and deploy pending |
 
 Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/JSP/pages/393219)
 is in Confluence.
