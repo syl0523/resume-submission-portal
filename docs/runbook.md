@@ -49,12 +49,18 @@ Cloudflare dashboard; the manual equivalents of steps 2 to 5 are kept for refere
      (extension, bearer token) and `/api/calendar/*` (calendar feed, secret URL).
    - Set vars in `wrangler.jsonc`: `ACCESS_TEAM_DOMAIN` = `<team>.cloudflareaccess.com`, `ACCESS_AUD` = the
      AUD tag. Redeploy.
+   - No domain yet? Use the `workers.dev` address (`resume-submission-portal.<subdomain>.workers.dev`) as the
+     domain of all three applications. Create them as self-hosted applications rather than with the Worker's
+     **Access** tab, which puts sign-in in front of every path, including the two Bypass paths.
 8. **Inbound email.** Email → Email Routing → enable for the domain (adds MX/TXT records) → Routing rules →
    **Catch-all** → action **Send to a Worker** → `resume-submission-portal`. Set `INBOUND_EMAIL_DOMAIN` to the
    domain. Your address appears in Settings (`jobs-xxxxxxxx@<domain>`).
-9. **Continuous deploy.** GitHub repo → Settings → Secrets and variables → Actions: secrets
-   `CLOUDFLARE_API_TOKEN` (Workers + D1 edit) and `CLOUDFLARE_ACCOUNT_ID`; variable `CLOUDFLARE_DEPLOY=true`.
-   Every green push to `main` then deploys.
+9. **Continuous deploy.** Cloudflare → Manage Account → Account API Tokens → Create Token (custom): Workers
+   **Admin** across all Workers (the first deploy creates the Worker, which Editor cannot; the older
+   "Workers Scripts: Edit" permission also works) and **D1 Edit** (the deploy applies migrations). Then GitHub
+   repo → Settings → Secrets and variables → Actions: secrets `CLOUDFLARE_API_TOKEN` and
+   `CLOUDFLARE_ACCOUNT_ID`; variable `CLOUDFLARE_DEPLOY=true`. Every green push to `main` then deploys (or
+   start it by hand: Actions → Deploy → Run workflow), and the run ends with a smoke check of the live Worker.
 
 ## Forward job emails to the portal
 

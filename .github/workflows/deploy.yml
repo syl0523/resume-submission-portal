@@ -53,4 +53,23 @@ jobs:
 
       - name: Deploy Worker
         working-directory: apps/portal
-        run: pnpm exec wrangler deploy
+        run: pnpm exec wrangler deploy 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+
+      # Proves the live Worker answers and reaches D1 through paths that Cloudflare Access bypasses,
+      # so the check keeps working after sign-in is turned on.
+      - name: Smoke check
+        run: |
+          url="$(grep -oE 'https://[a-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | head -n 1)"
+          if [ -z "$url" ]; then
+            echo "No workers.dev URL in the deploy output; skipping."
+            exit 0
+          fi
+          status() { curl -s -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --retry-all-errors "$@"; }
+          # Extension API: an unknown token is looked up in D1 and refused.
+          ext="$(status -H 'authorization: Bearer smoke-check-not-a-token' "$url/api/ext/ping")"
+          # Calendar feed: an unknown feed token is looked up in D1 and not found.
+          cal="$(status "$url/api/calendar/smoke-check.ics")"
+          # Web app: 200, or 302 to the Cloudflare Access sign-in once Access is on.
+          web="$(status "$url/")"
+          echo "Portal $url: extension API $ext, calendar $cal, web app $web"
+          test "$ext" = 401 && test "$cal" = 404 && { test "$web" = 200 || test "$web" = 302; }

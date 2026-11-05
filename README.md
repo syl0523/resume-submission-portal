@@ -20,7 +20,7 @@ stands, without handing your LinkedIn or Indeed account to a bot.
 
 ## Status
 
-Phase 1 runs end to end locally (`pnpm dev`); deploying it to Cloudflare is next. As of November 2026:
+Phase 1 runs end to end locally (`pnpm dev`) and is deployed to Cloudflare; turning on sign-in is next. As of November 2026:
 
 | Area                                                                   | State                                                                   |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -31,7 +31,7 @@ Phase 1 runs end to end locally (`pnpm dev`); deploying it to Cloudflare is next
 | AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                                    |
 | Web app                                                                | Done                                                                    |
 | Chrome extension: save with fit, mark applied, autofill, AI answers    | Done; Chrome Web Store listing later (KAN-36)                           |
-| Production on Cloudflare                                               | In progress (KAN-34): database created; file storage and deploy pending |
+| Production on Cloudflare                                               | Deployed; sign-in (Access), keys and email next (KAN-34)                |
 
 Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/JSP/pages/393219)
 is in Confluence.
