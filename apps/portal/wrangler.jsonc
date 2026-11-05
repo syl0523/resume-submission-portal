@@ -33,8 +33,8 @@
     // "access" = Cloudflare Access in front of the portal (production). Local dev overrides
     // this to "dev" in .dev.vars. The Worker refuses requests if Access is not configured.
     "AUTH_MODE": "access",
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": "",
+    "ACCESS_TEAM_DOMAIN": "resume-submission-portal.cloudflareaccess.com",
+    "ACCESS_AUD": "4e4c0366fc1a03585cc1419e4f8cd02aab35749ec38f5d818947e36e674588ee",
     // Domain routed to this Worker by Cloudflare Email Routing, e.g. "jobs.example.com".
     "INBOUND_EMAIL_DOMAIN": "",
     "FOLLOW_UP_AFTER_DAYS": "7",
