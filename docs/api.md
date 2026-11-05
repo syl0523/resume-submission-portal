@@ -52,7 +52,9 @@ Rules:
   (`appliedAt` desc, nulls last), `company` (A→Z), `fit` (`fitScore` desc, nulls last). Default `limit` 100, max 500.
 - **Create / dedupe**: the URL is canonicalised with `analyzeJobUrl`; `source` and `externalId` are filled from
   the URL when the client sent `manual`/`other` or omitted them. A job is a duplicate when the user already has
-  the same `url_key`, or the same `source` + `externalId`. `companyKey = normalizeCompany(company)`.
+  the same `url_key`, or the same `source` + `externalId`. `companyKey = normalizeCompany(company)`. Without
+  `fitScore`, the job is scored against the user's saved searches (the best `scoreJobFit` score; null when there
+  are none).
 - **Applied**: creating with a status past `saved`, or moving to `applied`, sets `appliedAt` (if empty) to now and
   `nextFollowUpAt = appliedAt + FOLLOW_UP_AFTER_DAYS`. Moving to a final status clears `nextFollowUpAt`.
 - **Status changes** from this endpoint are `manual` and go through `decideTransition`; a no-op returns 200 with
@@ -62,7 +64,8 @@ Rules:
 - **Resolve URL**: canonicalises the URL, fetches details from the official board API when the URL belongs to
   Greenhouse, Lever, Ashby or SmartRecruiters (`fetched: true`), and reports an existing application for the
   same URL. LinkedIn and Indeed URLs are never fetched server-side; `message` explains that the extension or
-  manual entry fills in the details.
+  manual entry fills in the details. When the board lookup fails, `fetched` is false and `message` says so; a 404
+  from the board says the posting may have closed.
 
 ## Resumes
 
@@ -145,7 +148,8 @@ Inbound email (Cloudflare Email Routing → Worker `email()` handler): the recip
 A row matches an existing application by URL key, else by `companyKey` + normalised title. Matches are
 updated (status forward via `decideTransition(..., 'import')`, empty `appliedAt` filled) and counted as
 `updated`, or `skipped` when nothing changes. New rows create a job (`capturedVia: 'import'`) and an
-application with an `import` event. Row-level problems go to `errors`.
+application with an `import` event, scored against your saved searches like `POST /api/applications`.
+Row-level problems go to `errors`.
 
 ## Watched company boards
 

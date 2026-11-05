@@ -20,18 +20,18 @@ stands, without handing your LinkedIn or Indeed account to a bot.
 
 ## Status
 
-Phase 1 runs end to end locally (`pnpm dev`) and is deployed to Cloudflare; turning on sign-in is next. As of November 2026:
+Phase 1 is live on Cloudflare behind Cloudflare Access sign-in; search keys and email forwarding are next. As of November 2026:
 
-| Area                                                                   | State                                                    |
-| ---------------------------------------------------------------------- | -------------------------------------------------------- |
-| API, data model and status engine                                      | Done                                                     |
-| Email forwarding and automatic tracking                                | Done                                                     |
-| CSV and LinkedIn import, company boards, daily cron, calendar feed     | Done                                                     |
-| Job Match: saved searches, fit scoring, duplicate merging, Discover    | Done                                                     |
-| AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                     |
-| Web app                                                                | Done                                                     |
-| Chrome extension: save with fit, mark applied, autofill, AI answers    | Done; Chrome Web Store listing later (KAN-36)            |
-| Production on Cloudflare                                               | Deployed; sign-in (Access), keys and email next (KAN-34) |
+| Area                                                                   | State                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| API, data model and status engine                                      | Done                                                                       |
+| Email forwarding and automatic tracking                                | Done                                                                       |
+| CSV and LinkedIn import, company boards, daily cron, calendar feed     | Done                                                                       |
+| Job Match: saved searches, fit scoring, duplicate merging, Discover    | Done                                                                       |
+| AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                                       |
+| Web app                                                                | Done                                                                       |
+| Chrome extension: save with fit, mark applied, autofill, AI answers    | Done; Chrome Web Store listing later (KAN-36)                              |
+| Production on Cloudflare                                               | Live with sign-in; search keys (KAN-61) and email forwarding (KAN-62) next |
 
 Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/RSP/pages/393219)
 is in Confluence.
