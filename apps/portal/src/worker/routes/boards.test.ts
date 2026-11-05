@@ -194,7 +194,9 @@ describe('watched boards, daily sync and no-response marking', () => {
       .bind('2026-09-01T12:00:00.000Z', quiet.body.application.id)
       .run();
 
-    const count = await markGhosted(db, t.env, new Date('2026-11-04T11:00:00Z'));
+    // A clock just after the application was created, so the timeline order is stable on any day.
+    const later = new Date(Date.now() + 60_000);
+    const count = await markGhosted(db, t.env, later);
     expect(count).toBe(1);
     const detail = await t.json<ApplicationDetail>(
       `/api/applications/${quiet.body.application.id}`,
@@ -210,7 +212,7 @@ describe('watched boards, daily sync and no-response marking', () => {
       summary: 'No response for 21 days',
     });
 
-    expect(await markGhosted(db, t.env, new Date('2026-11-04T11:00:00Z'))).toBe(0);
+    expect(await markGhosted(db, t.env, later)).toBe(0);
   });
 
   it('deletes a board with its postings', async () => {
