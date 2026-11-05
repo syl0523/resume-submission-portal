@@ -33,7 +33,7 @@ Phase 1 runs end to end locally (`pnpm dev`) and is deployed to Cloudflare; turn
 | Chrome extension: save with fit, mark applied, autofill, AI answers    | Done; Chrome Web Store listing later (KAN-36)            |
 | Production on Cloudflare                                               | Deployed; sign-in (Access), keys and email next (KAN-34) |
 
-Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/JSP/pages/393219)
+Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/RSP/pages/393219)
 is in Confluence.
 
 ## Architecture in one picture
@@ -67,4 +67,4 @@ Production setup, email forwarding, LinkedIn import and extension install: [docs
 - [How work is tracked and built](docs/contributing.md)
 
 Tracking: Jira project [KAN](https://roysunsyl.atlassian.net/jira/software/projects/KAN) · Confluence space
-[JSP](https://roysunsyl.atlassian.net/wiki/spaces/JSP)
+[RSP](https://roysunsyl.atlassian.net/wiki/spaces/RSP)

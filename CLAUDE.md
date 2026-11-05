@@ -42,6 +42,6 @@ pnpm format                     # biome --write
 
 ## Tracking
 
-Jira project **KAN** at https://roysunsyl.atlassian.net (epics KAN-4..KAN-11). Confluence space **JSP**.
+Jira project **KAN** at https://roysunsyl.atlassian.net (epics KAN-4..KAN-11). Confluence space **RSP** (Resume Submission Portal).
 Branch names and PR titles start with the Jira key (`KAN-16-applications-api`, `KAN-16 Applications API`),
 commit messages too (`KAN-16: add dedupe on create`), so GitHub for Jira links them.

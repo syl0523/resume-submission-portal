@@ -5,7 +5,7 @@
 | Tool       | Holds                                                   | Link                                                       |
 | ---------- | ------------------------------------------------------- | ---------------------------------------------------------- |
 | Jira       | Backlog: epics KAN-4..KAN-11 plus Job Match and Phase 2 | https://roysunsyl.atlassian.net/jira/software/projects/KAN |
-| Confluence | Architecture, decisions, runbook, progress              | https://roysunsyl.atlassian.net/wiki/spaces/JSP            |
+| Confluence | Architecture, decisions, runbook, progress              | https://roysunsyl.atlassian.net/wiki/spaces/RSP            |
 | GitHub     | Code, pull requests, CI, deploys                        | https://github.com/syl0523/resume-submission-portal        |
 
 Install **GitHub for Jira** (Atlassian Marketplace, free) and connect this repository: branches, commits and
