@@ -114,6 +114,43 @@ describe('scoreJobFit', () => {
   });
 });
 
+describe('location fit', () => {
+  const reasonsFor = (locations: string[], location: string) =>
+    scoreJobFit(profile({ locations }), job({ location, remoteType: 'onsite' }), NOW).reasons;
+
+  it('treats the Bay Area as one place covering its cities', () => {
+    for (const where of [
+      'San Jose, CA',
+      'Palo Alto, California',
+      'South San Francisco, CA',
+      'Oakland, CA',
+    ]) {
+      expect(reasonsFor(['San Francisco Bay Area'], where)).toContain(`In ${where}`);
+    }
+    expect(reasonsFor(['Bay Area'], 'San Diego, CA')).not.toContain('In San Diego, CA');
+    expect(reasonsFor(['Silicon Valley'], 'Mountain View, CA')).toContain('In Mountain View, CA');
+  });
+
+  it('matches whole city names, not single words', () => {
+    expect(reasonsFor(['New York, NY'], 'New Orleans, LA')).not.toContain('In New Orleans, LA');
+    expect(reasonsFor(['San Francisco, CA'], 'San Diego, CA')).not.toContain('In San Diego, CA');
+    expect(reasonsFor(['New York, NY'], 'New York, New York, United States')).toContain(
+      'In New York, New York, United States',
+    );
+  });
+
+  it('gives a same-state posting partial credit', () => {
+    const score = (location: string) =>
+      scoreJobFit(
+        profile({ locations: ['San Francisco, CA'] }),
+        job({ location, remoteType: 'onsite' }),
+        NOW,
+      ).score;
+    expect(score('San Francisco, CA')).toBeGreaterThan(score('Los Angeles, CA'));
+    expect(score('Los Angeles, CA')).toBeGreaterThan(score('Denver, CO'));
+  });
+});
+
 describe('planQueries', () => {
   it('interleaves titles and places, adding a remote query, within the cap', () => {
     const queries = planQueries(profile({ locations: ['Austin, TX', 'Remote'] }), 4);

@@ -11,6 +11,7 @@ import {
   prepareJob,
   type TransitionTarget,
 } from './applications';
+import { bestFitScore, listSavedSearches } from './searches';
 
 /**
  * Bulk import (KAN-23). Reads the user's applications once, then writes in D1 batches, so a
@@ -39,6 +40,7 @@ export async function importApplications(
   label: string,
 ): Promise<ImportResult> {
   const result: ImportResult = { created: 0, updated: 0, skipped: 0, errors: [] };
+  const searches = await listSavedSearches(db, userId);
   const [known, resumeRows] = await Promise.all([
     db
       .select({
@@ -136,6 +138,7 @@ export async function importApplications(
       userId,
       {
         job: row.job,
+        fitScore: bestFitScore(searches, row.job),
         status: row.status,
         capturedVia: 'import',
         source: 'import',

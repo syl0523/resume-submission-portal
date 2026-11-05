@@ -8,6 +8,7 @@ import {
   type SavedSearchRequest,
   SENIORITY_LEVELS,
   type SearchHit,
+  type SearchProvider,
   type SeniorityLevel,
   WORK_MODES,
   type WorkMode,
@@ -34,7 +35,7 @@ import {
   Spinner,
 } from '../components/ui';
 import { api, del, post, put } from '../lib/api';
-import { formatSalary, relativeDay, splitList } from '../lib/format';
+import { formatSalary, relativeDay, splitList, splitLocations } from '../lib/format';
 import {
   invalidateApplications,
   keys,
@@ -95,7 +96,7 @@ function toForm(s: SavedSearch | SavedSearchDraft | null): FormState {
     resumeId: s?.resumeId ?? '',
     titles: s?.titles.join(', ') ?? '',
     skills: s?.skills.join(', ') ?? '',
-    locations: s?.locations.join(', ') ?? '',
+    locations: s?.locations.join('; ') ?? '',
     workMode: s?.workMode ?? 'any',
     seniority: s?.seniority ?? '',
     keywords: s?.keywords.join(', ') ?? '',
@@ -108,13 +109,20 @@ function toForm(s: SavedSearch | SavedSearchDraft | null): FormState {
   };
 }
 
+const PROVIDER_LABEL: Record<SearchProvider, string> = {
+  jsearch: 'LinkedIn · Indeed · company sites',
+  adzuna: 'Adzuna',
+  usajobs: 'USAJOBS',
+  boards: 'Company boards',
+};
+
 function toRequest(f: FormState): SavedSearchRequest {
   return {
     name: f.name.trim(),
     resumeId: f.resumeId || null,
     titles: splitList(f.titles),
     skills: splitList(f.skills),
-    locations: splitList(f.locations),
+    locations: splitLocations(f.locations),
     workMode: f.workMode,
     seniority: f.seniority || null,
     keywords: splitList(f.keywords),
@@ -231,7 +239,7 @@ function SearchForm({
         </Field>
         <Field
           label="Locations"
-          hint="“Austin, TX”, ZIP codes, or “Remote”. Empty = anywhere in the US."
+          hint="e.g. “New York, NY; Remote”. ZIP codes work too. Empty = anywhere in the US."
         >
           {(id) => (
             <Input id={id} value={f.locations} onChange={(e) => set('locations', e.target.value)} />
@@ -619,10 +627,10 @@ export function SearchDetail() {
             {lastRun.providers.map((p) => (
               <Badge
                 key={p.provider}
-                tone={p.error ? 'muted' : 'success'}
+                tone={p.error || p.total === 0 ? 'muted' : 'success'}
                 title={p.error ?? undefined}
               >
-                {p.provider}:{' '}
+                {PROVIDER_LABEL[p.provider]}:{' '}
                 {p.error === 'not_configured'
                   ? 'not set up'
                   : p.error
@@ -638,9 +646,23 @@ export function SearchDetail() {
           <ErrorNote error={hits.error} />
           {hits.data && hits.data.items.length === 0 ? (
             <p className="py-4 text-sm text-ink-2">
-              {search.lastRunAt
-                ? 'No results to show. Try broader titles or places, or the links below.'
-                : 'Run the search to collect matches.'}
+              {!search.lastRunAt ? (
+                'Run the search to collect matches.'
+              ) : me && !me.features.jsearch && !me.features.adzuna && !me.features.usajobs ? (
+                <>
+                  No job search service is connected yet, so only your{' '}
+                  <Link to="/boards" className="text-accent hover:underline">
+                    watched company boards
+                  </Link>{' '}
+                  are searched. A JSearch key adds LinkedIn, Indeed and company sites (see{' '}
+                  <Link to="/settings" className="text-accent hover:underline">
+                    Settings
+                  </Link>
+                  ). Meanwhile, use the links below.
+                </>
+              ) : (
+                'No results to show. Try broader titles or places, or the links below.'
+              )}
             </p>
           ) : null}
           <ul className="-mx-4 divide-y divide-line sm:-mx-5">

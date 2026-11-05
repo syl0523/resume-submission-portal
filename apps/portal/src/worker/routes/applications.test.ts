@@ -355,7 +355,7 @@ describe('applications API', () => {
       jsonBody('POST', { url: 'https://job-boards.greenhouse.io/northwind/jobs/9999' }),
     );
     expect(missing.body.fetched).toBe(false);
-    expect(missing.body.message).toContain('Fill them in here');
+    expect(missing.body.message).toContain('may have closed');
   });
 
   it('deletes the application, its job and its timeline', async () => {
@@ -373,5 +373,31 @@ describe('applications API', () => {
       .bind(target?.job.id)
       .first<{ n: number }>();
     expect(jobsLeft?.n).toBe(0);
+  });
+
+  it('scores jobs added by hand against the saved searches', async () => {
+    const search = await t.json<{ id: string }>(
+      '/api/searches',
+      jsonBody('POST', {
+        name: 'Reliability leadership',
+        titles: ['Site Reliability Engineering Manager'],
+        skills: ['incident management', 'postmortems'],
+        locations: ['San Francisco Bay Area'],
+        keywords: [],
+        excludeKeywords: [],
+      }),
+    );
+    expect(search.status).toBe(201);
+    const { status, body } = await create({
+      job: {
+        title: 'Manager, Site Reliability Engineering',
+        company: 'Example Cloud',
+        url: 'https://jobs.lever.co/example-cloud/11111111-2222-3333-4444-555555555555',
+        location: 'San Jose, CA',
+        description: 'Lead incident management and blameless postmortems for our platform.',
+      },
+    });
+    expect(status).toBe(201);
+    expect(body.application.fitScore).toBeGreaterThan(60);
   });
 });

@@ -87,6 +87,7 @@ function WeeklyChart({ weeks }: { weeks: WeeklyPoint[] }) {
 }
 
 function Body({ stats }: { stats: DashboardStats }) {
+  const sent = stats.total - stats.counts.saved;
   if (stats.total === 0) {
     return (
       <EmptyState
@@ -107,14 +108,23 @@ function Body({ stats }: { stats: DashboardStats }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Tile label="In progress" value={stats.active} hint={`${stats.total} total`} />
+        <Tile
+          label="In progress"
+          value={stats.active}
+          hint={
+            stats.counts.saved > 0
+              ? `${stats.counts.saved} saved to apply · ${stats.total} total`
+              : `${stats.total} total`
+          }
+        />
         <Tile
           label="Applied, 7 days"
           value={stats.appliedLast7Days}
           hint={`${stats.appliedLast30Days} in 30 days`}
         />
-        <Tile label="Response rate" value={formatPercent(stats.responseRate)} />
-        <Tile label="Interview rate" value={formatPercent(stats.interviewRate)} />
+        {/* Rates mean nothing until something has been sent. */}
+        <Tile label="Response rate" value={sent > 0 ? formatPercent(stats.responseRate) : '—'} />
+        <Tile label="Interview rate" value={sent > 0 ? formatPercent(stats.interviewRate) : '—'} />
         <Tile
           label="Interviews"
           value={stats.counts.interview}

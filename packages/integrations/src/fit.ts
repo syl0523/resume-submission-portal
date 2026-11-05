@@ -88,14 +88,86 @@ const SENIOR_TITLE =
   /\b(senior|sr|lead|principal|staff|director|head of|vp|vice president|chief)\b/i;
 const JUNIOR_TITLE = /\b(intern|internship|junior|jr|entry[- ]level|graduate|trainee)\b/i;
 
-function locationParts(location: string): string[] {
-  return normalizeForCompare(location)
-    .split(' ')
-    .filter(
-      (w) =>
-        w.length >= 2 &&
-        !['remote', 'usa', 'us', 'united', 'states', 'hybrid', 'onsite'].includes(w),
-    );
+/**
+ * Metro areas a search can name as one place, with the cities inside them. Only names that are
+ * not also well-known places elsewhere (no Dublin, Richmond, Cambridge or Newark).
+ */
+const METROS: [RegExp, string[]][] = [
+  [
+    /\b(sf )?bay area\b|\bsilicon valley\b/,
+    [
+      'san francisco',
+      'oakland',
+      'berkeley',
+      'emeryville',
+      'alameda',
+      'san jose',
+      'santa clara',
+      'sunnyvale',
+      'mountain view',
+      'palo alto',
+      'menlo park',
+      'redwood city',
+      'redwood shores',
+      'san mateo',
+      'foster city',
+      'burlingame',
+      'san bruno',
+      'millbrae',
+      'san carlos',
+      'brisbane',
+      'daly city',
+      'cupertino',
+      'milpitas',
+      'fremont',
+      'hayward',
+      'pleasanton',
+      'livermore',
+      'san ramon',
+      'walnut creek',
+      'los gatos',
+      'campbell',
+      'los altos',
+      'san rafael',
+      'novato',
+      'bay area',
+      'silicon valley',
+    ],
+  ],
+  [
+    /\bnew york city\b|\bnyc\b|\bnew york metro/,
+    [
+      'new york',
+      'nyc',
+      'manhattan',
+      'brooklyn',
+      'queens',
+      'bronx',
+      'long island city',
+      'jersey city',
+      'hoboken',
+    ],
+  ],
+  [
+    /\b(greater )?seattle area\b|\bpuget sound\b/,
+    ['seattle', 'bellevue', 'redmond', 'kirkland', 'bothell'],
+  ],
+];
+
+/**
+ * What a place in a search names: a metro's cities, else the city before the first comma, plus the
+ * two-letter state after it ("Austin, TX" → austin + tx). A lone state code names the state.
+ */
+function placeMatcher(place: string): { names: string[]; state: string | null } {
+  const norm = normalizeForCompare(place);
+  for (const [re, cities] of METROS) if (re.test(norm)) return { names: cities, state: null };
+  const [cityPart = '', ...rest] = place.split(',');
+  const city = normalizeForCompare(cityPart);
+  const stateToken = rest.map((r) => r.trim()).find((r) => /^[a-z]{2}$/i.test(r));
+  const state = stateToken ? stateToken.toLowerCase() : null;
+  if (rest.length === 0 && /^[a-z]{2}$/.test(city)) return { names: [], state: city };
+  if (!city || /^\d{5}$/.test(city)) return { names: [], state };
+  return { names: [city], state };
 }
 
 /**
@@ -165,13 +237,18 @@ export function scoreJobFit(
   } else if (places.length === 0) {
     placeFit = job.remoteType === 'unknown' ? 0.6 : 0.8;
   } else if (job.location) {
+    // Whole places, not single words: "New York" must not match "New Orleans", and "San
+    // Francisco Bay Area" must match "San Jose, CA" but not "San Diego, CA".
     const where = normalizeForCompare(job.location);
-    const hit = places.find((p) =>
-      locationParts(p).some((part) => new RegExp(`\\b${escapeRe(part)}\\b`).test(where)),
-    );
-    if (hit) {
+    const has = (name: string) => new RegExp(`\\b${escapeRe(name)}\\b`).test(where);
+    const matchers = places.map(placeMatcher);
+    if (matchers.some((m) => m.names.some(has))) {
       placeFit = 1;
       reasons.push(`In ${job.location}`);
+    } else if (matchers.some((m) => m.state !== null && has(m.state))) {
+      placeFit = 0.5;
+    } else if (matchers.every((m) => m.names.length === 0 && m.state === null)) {
+      placeFit = 0.5;
     } else {
       placeFit = 0.2;
     }

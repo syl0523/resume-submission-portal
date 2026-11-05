@@ -1,4 +1,5 @@
 import type { SavedSearch, SearchProfileParsed } from '@jsp/core';
+import { type FitJob, scoreJobFit } from '@jsp/integrations';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { type SavedSearchRow, savedSearches, searchHits } from '../db/schema';
@@ -57,4 +58,17 @@ export function criteriaOf(row: SavedSearchRow): SearchProfileParsed {
     needsSponsorship: s.needsSponsorship,
     summary: s.summary,
   };
+}
+
+/**
+ * A job's best fit (0-100) across the user's saved searches, scored the way Job Match scores its
+ * hits. For jobs that arrive without a score (added by hand or imported); null without searches.
+ */
+export function bestFitScore(
+  searches: SavedSearch[],
+  job: FitJob,
+  now = new Date(),
+): number | null {
+  if (searches.length === 0) return null;
+  return Math.max(...searches.map((s) => scoreJobFit(s, job, now).score));
 }

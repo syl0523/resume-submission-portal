@@ -6,6 +6,7 @@ import {
   fromDateInput,
   relativeDay,
   splitList,
+  splitLocations,
   toDateInput,
 } from './format';
 
@@ -86,5 +87,28 @@ describe('api client', () => {
     expect(init?.body).toBe('{"fullName":"Jane"}');
     const headers = (init?.headers ?? {}) as Record<string, string>;
     expect(headers['content-type']).toBe('application/json');
+  });
+});
+
+describe('splitLocations', () => {
+  it('keeps "City, ST" together and splits places', () => {
+    expect(splitLocations('New York, NY, Remote')).toEqual(['New York, NY', 'Remote']);
+    expect(splitLocations('Austin, TX, Dallas, TX')).toEqual(['Austin, TX', 'Dallas, TX']);
+    expect(splitLocations('Austin, Texas, USA; 10001\nWashington, DC')).toEqual([
+      'Austin, Texas, USA',
+      '10001',
+      'Washington, DC',
+    ]);
+  });
+
+  it('treats lone states as separate places', () => {
+    expect(splitLocations('NY, NJ')).toEqual(['NY', 'NJ']);
+    expect(splitLocations('Texas, California')).toEqual(['Texas', 'California']);
+    expect(splitLocations(' ; ,Remote,, ')).toEqual(['Remote']);
+  });
+
+  it('round-trips through the "; " display form', () => {
+    const places = ['New York, NY', 'San Francisco, CA', 'Remote'];
+    expect(splitLocations(places.join('; '))).toEqual(places);
   });
 });

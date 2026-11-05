@@ -15,7 +15,7 @@ import {
   statusChangeSchema,
   updateApplicationSchema,
 } from '@jsp/core';
-import { analyzeJobUrl, fetchJobFromUrl, normalizeCompany } from '@jsp/integrations';
+import { analyzeJobUrl, fetchJobFromUrl, normalizeCompany, UpstreamError } from '@jsp/integrations';
 import { and, type Column, count, desc, eq, inArray, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { Hono } from 'hono';
@@ -24,7 +24,7 @@ import { type Db, runBatch } from '../db/client';
 import { applications, jobs } from '../db/schema';
 import { type AppEnv, outboundFetch } from '../env';
 import { toCsv } from '../lib/csv';
-import { HttpError, notFound } from '../lib/errors';
+import { describeError, HttpError, notFound } from '../lib/errors';
 import { toListItem } from '../lib/mappers';
 import { nowIso, toIso } from '../lib/time';
 import { validate } from '../lib/validate';
@@ -36,6 +36,7 @@ import {
   getApplicationDetail,
   transitionStatus,
 } from '../services/applications';
+import { bestFitScore, listSavedSearches } from '../services/searches';
 
 /**
  * Applications CRUD, status, notes, interviews, resolve-url and export.csv. Mounted at
@@ -236,6 +237,8 @@ applicationRoutes.get('/export.csv', validate('query', exportQuerySchema), async
 applicationRoutes.post('/', validate('json', createApplicationSchema), async (c) => {
   const body = c.req.valid('json');
   const userId = c.var.user.id;
+  const fitScore =
+    body.fitScore ?? bestFitScore(await listSavedSearches(c.var.db, userId), body.job);
   const result = await createApplication(c.var.db, c.env, userId, {
     job: body.job,
     status: body.status,
@@ -245,7 +248,7 @@ applicationRoutes.post('/', validate('json', createApplicationSchema), async (c)
     appliedAt: body.appliedAt ?? null,
     appliedVia: body.appliedVia ?? null,
     notes: body.notes ?? null,
-    fitScore: body.fitScore ?? null,
+    fitScore,
   });
   if (result.duplicate) throw duplicate(result.applicationId);
   return c.json(await getApplicationDetail(c.var.db, userId, result.applicationId), 201);
@@ -288,8 +291,12 @@ applicationRoutes.post('/resolve-url', validate('json', resolveUrlSchema), async
         'Details for this site cannot be read automatically. Fill them in here, or save the posting with the browser extension.';
     }
   } catch (err) {
-    const reason = err instanceof Error ? err.message : 'unknown error';
-    body.message = `Could not fetch the posting details (${reason}). Fill them in here.`;
+    // A 404 from the board means the posting is gone; anything else is worth a retry later.
+    const closed = err instanceof UpstreamError && err.status === 404;
+    console.warn('Posting lookup failed', describeError(err));
+    body.message = closed
+      ? 'This posting was not found on the job board, so it may have closed. Fill in the details here if you still want to track it.'
+      : 'Could not read the posting from the job board right now. Fill in the details here.';
   }
   return c.json(body);
 });

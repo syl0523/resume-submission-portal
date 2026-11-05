@@ -129,6 +129,57 @@ export function fromDateTimeInput(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+const STATE_CODES = new Set(
+  (
+    'AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM ' +
+    'NY NC ND OH OK OR PA PR RI SC SD TN TX UT VT VA WA WV WI WY'
+  ).split(' '),
+);
+const STATE_NAMES = new Set(
+  (
+    'alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|district of columbia|' +
+    'florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|' +
+    'massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|' +
+    'new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|' +
+    'puerto rico|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|' +
+    'washington|west virginia|wisconsin|wyoming'
+  ).split('|'),
+);
+const COUNTRY = /^(usa|us|u\.s\.a?\.?|united states( of america)?)$/i;
+const isStateCode = (token: string) => token.length === 2 && STATE_CODES.has(token.toUpperCase());
+const isStateName = (token: string) => STATE_NAMES.has(token.toLowerCase());
+
+/**
+ * Places typed into one box: "New York, NY, Remote" ⇄ ["New York, NY", "Remote"]. Commas inside a
+ * place are kept by joining a state (code or name) or country onto the city before it; semicolons
+ * and new lines always separate places. Shown back joined with "; " so editing round-trips.
+ */
+export function splitLocations(value: string): string[] {
+  const places: string[] = [];
+  for (const segment of value.split(/[;\n]/)) {
+    let place: string[] = [];
+    for (const raw of segment.split(',')) {
+      const token = raw.trim();
+      if (!token) continue;
+      const prev = place[place.length - 1];
+      // "New York, NY" and "Austin, Texas" are one place; "NY, NJ" and "Texas, California" are two.
+      const joinsPrev =
+        prev !== undefined &&
+        (COUNTRY.test(token) ||
+          (isStateCode(token) && !isStateCode(prev) && !COUNTRY.test(prev)) ||
+          (isStateName(token) && !isStateCode(prev) && !isStateName(prev) && !COUNTRY.test(prev)));
+      if (joinsPrev) {
+        place.push(token);
+      } else {
+        if (place.length > 0) places.push(place.join(', '));
+        place = [token];
+      }
+    }
+    if (place.length > 0) places.push(place.join(', '));
+  }
+  return places;
+}
+
 /** "a, b, c" ⇄ ["a", "b", "c"] for comma-separated list inputs. */
 export function splitList(value: string): string[] {
   return value

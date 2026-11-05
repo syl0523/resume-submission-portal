@@ -89,15 +89,13 @@ function Row({ a }: { a: ApplicationListItem }) {
           <p className="truncate text-sm text-ink-2">
             {a.job.company}
             {a.job.location ? ` · ${a.job.location}` : ''}
+            {salary ? ` · ${salary}` : ''}
           </p>
         </div>
         <div className="justify-self-end md:justify-self-start">
           <StatusBadge status={a.status} />
         </div>
-        <p className="hidden truncate text-sm text-ink-2 md:block">
-          {SOURCE_LABEL[a.job.source]}
-          {salary ? ` · ${salary}` : ''}
-        </p>
+        <p className="hidden truncate text-sm text-ink-2 md:block">{SOURCE_LABEL[a.job.source]}</p>
         <p className="hidden text-sm text-ink-2 md:block">
           {a.appliedAt ? relativeDay(a.appliedAt) : '—'}
         </p>

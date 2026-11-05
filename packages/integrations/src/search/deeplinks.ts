@@ -25,7 +25,7 @@ const GOOGLE_DATE: Record<number, string> = {
 /** Indeed's "Remote" filter value. */
 const INDEED_REMOTE = '032b3046-06a3-4876-8dfd-474eb5e7ed11';
 
-const MAX_LINKS = 8;
+const MAX_LINKS = 12;
 
 export function buildDeepLinks(
   profile: Pick<
