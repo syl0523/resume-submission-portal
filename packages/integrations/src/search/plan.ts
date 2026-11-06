@@ -1,17 +1,26 @@
 import type { SearchProfileParsed } from '@jsp/core';
+import { canonicalPlace, isRemotePlace } from '../locations';
 import type { SearchQuery } from './types';
 
 /**
  * Turn a search profile into at most `maxQueries` title x location queries, most important first
  * (titles in profile order, interleaved across places; "Remote" in locations or workMode=remote
- * adds a US-wide remote query; no places at all means US-wide).
+ * adds a US-wide remote query; no places at all means US-wide). Places are canonical: a metro
+ * alias becomes the metro's name ("Bay Area" → "San Francisco Bay Area") and "United States"
+ * means US-wide (null). Each provider client turns a metro into its own location parameters.
  */
 export function planQueries(profile: SearchProfileParsed, maxQueries: number): SearchQuery[] {
-  const wantsRemote =
-    profile.workMode === 'remote' || profile.locations.some((l) => /remote/i.test(l));
-  const places: { location: string | null; remote: boolean }[] = profile.locations
-    .filter((l) => !/remote/i.test(l))
-    .map((location) => ({ location, remote: false }));
+  const wantsRemote = profile.workMode === 'remote' || profile.locations.some(isRemotePlace);
+  const places: { location: string | null; remote: boolean }[] = [];
+  const seen = new Set<string>();
+  for (const place of profile.locations) {
+    if (isRemotePlace(place)) continue;
+    const location = canonicalPlace(place);
+    const key = location?.toLowerCase() ?? '';
+    if (seen.has(key)) continue;
+    seen.add(key);
+    places.push({ location, remote: false });
+  }
   if (wantsRemote) places.push({ location: null, remote: true });
   if (places.length === 0) places.push({ location: null, remote: false });
 

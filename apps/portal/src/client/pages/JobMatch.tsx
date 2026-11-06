@@ -1,5 +1,6 @@
 import {
   type ApplicationDetail,
+  DEFAULT_SEARCH_LOCATION,
   type DeepLinkGroup,
   type FitFlag,
   type RunSearchResponse,
@@ -96,7 +97,8 @@ function toForm(s: SavedSearch | SavedSearchDraft | null): FormState {
     resumeId: s?.resumeId ?? '',
     titles: s?.titles.join(', ') ?? '',
     skills: s?.skills.join(', ') ?? '',
-    locations: s?.locations.join('; ') ?? '',
+    // New searches start in the default place (KAN-65).
+    locations: s ? s.locations.join('; ') : DEFAULT_SEARCH_LOCATION,
     workMode: s?.workMode ?? 'any',
     seniority: s?.seniority ?? '',
     keywords: s?.keywords.join(', ') ?? '',
@@ -239,10 +241,15 @@ function SearchForm({
         </Field>
         <Field
           label="Locations"
-          hint="e.g. “New York, NY; Remote”. ZIP codes work too. Empty = anywhere in the US."
+          hint={`Default: ${DEFAULT_SEARCH_LOCATION} (covers its cities). e.g. “Austin, TX; Remote”; ZIP codes work too; “United States” = anywhere in the US.`}
         >
           {(id) => (
-            <Input id={id} value={f.locations} onChange={(e) => set('locations', e.target.value)} />
+            <Input
+              id={id}
+              value={f.locations}
+              placeholder={DEFAULT_SEARCH_LOCATION}
+              onChange={(e) => set('locations', e.target.value)}
+            />
           )}
         </Field>
         <Field label="Work arrangement">

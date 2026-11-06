@@ -163,6 +163,69 @@ describe('planQueries', () => {
     expect(planQueries(profile({ locations: [] }), 8).map((q) => q.location)).toEqual([null, null]);
     expect(planQueries(profile(), 1)).toHaveLength(1);
   });
+
+  it('names metros canonically, merges their aliases and reads "United States" as US-wide', () => {
+    const queries = planQueries(
+      profile({ titles: ['SRE Lead'], locations: ['Bay Area', 'SF Bay Area', 'United States'] }),
+      8,
+    );
+    expect(queries.map((q) => [q.location, q.remote])).toEqual([
+      ['San Francisco Bay Area', false],
+      [null, false],
+    ]);
+  });
+});
+
+describe('Bay Area searches', () => {
+  const bayArea = (over: Partial<SearchProfileParsed> = {}) =>
+    profile({
+      titles: ['Incident Manager'],
+      skills: [],
+      locations: ['San Francisco Bay Area'],
+      minSalary: null,
+      ...over,
+    });
+
+  it('scores postings across the Bay Area above ones elsewhere in California and beyond', () => {
+    const score = (location: string) =>
+      scoreJobFit(
+        bayArea(),
+        job({ title: 'Incident Manager', location, remoteType: 'onsite' }),
+        NOW,
+      );
+    const oakland = score('Oakland, CA');
+    expect(oakland.reasons).toContain('In Oakland, CA');
+    expect(score('Dublin, CA').reasons).toContain('In Dublin, CA');
+    expect(score('Dublin, Ireland').reasons).not.toContain('In Dublin, Ireland');
+    expect(oakland.score).toBeGreaterThan(score('Los Angeles, CA').score);
+    expect(score('Los Angeles, CA').score).toBeGreaterThan(score('Charlotte, NC').score);
+    // "United States" next to the metro: postings elsewhere are acceptable, the metro still wins.
+    const both = bayArea({ locations: ['San Francisco Bay Area', 'United States'] });
+    const charlotte = job({ title: 'Incident Manager', location: 'Charlotte, NC' });
+    expect(scoreJobFit(both, charlotte, NOW).score).toBeGreaterThan(
+      scoreJobFit(bayArea(), charlotte, NOW).score,
+    );
+    expect(
+      scoreJobFit(both, job({ title: 'Incident Manager', location: 'Oakland, CA' }), NOW).score,
+    ).toBeGreaterThan(scoreJobFit(both, charlotte, NOW).score);
+  });
+
+  it('builds region-aware LinkedIn, Indeed and Google Jobs links', () => {
+    const [linkedin, indeed, google] = buildDeepLinks(bayArea({ locations: ['Bay Area'] }));
+    expect(linkedin?.links[0]?.label).toBe('Incident Manager · San Francisco Bay Area');
+    const li = new URL(linkedin?.links[0]?.url ?? '');
+    expect(li.searchParams.get('location')).toBe('San Francisco Bay Area');
+    expect(li.searchParams.get('geoId')).toBe('90000084');
+    expect(new URL(indeed?.links[0]?.url ?? '').searchParams.get('l')).toBe(
+      'San Francisco Bay Area, CA',
+    );
+    expect(new URL(google?.links[0]?.url ?? '').searchParams.get('q')).toBe(
+      'Incident Manager jobs in San Francisco Bay Area',
+    );
+    // Other places keep their own text and no geoId.
+    const [austin] = buildDeepLinks(bayArea({ locations: ['Austin, TX'] }));
+    expect(new URL(austin?.links[0]?.url ?? '').searchParams.get('geoId')).toBeNull();
+  });
 });
 
 describe('dedupeJobs', () => {

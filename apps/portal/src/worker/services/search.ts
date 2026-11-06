@@ -1,6 +1,6 @@
 import { jobInputSchema, type ProviderOutcome, type SearchProvider } from '@jsp/core';
 import {
-  normalizeForCompare,
+  matchPlace,
   type SearchQuery,
   type SearchResult,
   type SearchResultItem,
@@ -56,12 +56,10 @@ async function searchBoards(db: Db, userId: string, queries: SearchQuery[]): Pro
     const fits = queries.some((q) => {
       if (titleSimilarity(q.title, posting.title) < 0.55) return false;
       if (q.remote) return remote || !location;
-      if (!q.location) return true;
-      const wanted = normalizeForCompare(q.location)
-        .split(' ')
-        .filter((w) => w.length >= 2);
-      const where = normalizeForCompare(location);
-      return remote || wanted.some((w) => where.includes(w));
+      if (!q.location || !location || remote) return true;
+      // A metro covers its cities ("San Francisco Bay Area" keeps "Oakland, CA").
+      const fit = matchPlace(q.location, location);
+      return fit === 'match' || fit === 'unknown';
     });
     if (!fits || seen.has(posting.id)) continue;
     seen.add(posting.id);

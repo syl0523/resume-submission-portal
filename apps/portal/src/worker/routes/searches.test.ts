@@ -70,8 +70,11 @@ function jsearchData() {
   return data;
 }
 
+const requested: string[] = [];
+
 const fakeFetch = (async (input: RequestInfo | URL) => {
   const url = String(input);
+  requested.push(url);
   const json = (body: unknown) =>
     new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
   if (url.includes('jsearch.p.rapidapi.com/search'))
@@ -270,6 +273,41 @@ describe('Job Match and Discover', () => {
     const northwind = body.items.find((i) => i.job.company === 'Northwind Freight');
     expect(northwind?.existingApplicationId).not.toBeNull();
     expect(body.items.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('defaults new searches and Discover to the San Francisco Bay Area', async () => {
+    const { locations: _omitted, ...noPlace } = SEARCH;
+    const created = await t.json<SavedSearch>(
+      '/api/searches',
+      jsonBody('POST', { ...noPlace, name: 'No place given' }),
+    );
+    expect(created.status).toBe(201);
+    expect(created.body.locations).toEqual(['San Francisco Bay Area']);
+    const cleared = await t.json<SavedSearch>(
+      `/api/searches/${created.body.id}`,
+      jsonBody('PUT', { ...SEARCH, name: 'Cleared', locations: [] }),
+    );
+    expect(cleared.body.locations).toEqual(['San Francisco Bay Area']);
+    const nationwide = await t.json<SavedSearch>(
+      `/api/searches/${created.body.id}`,
+      jsonBody('PUT', { ...SEARCH, name: 'Whole US', locations: ['United States'] }),
+    );
+    expect(nationwide.body.locations).toEqual(['United States']);
+
+    const jsearchQueries = () =>
+      requested
+        .splice(0)
+        .filter((u) => u.includes('jsearch.p.rapidapi.com'))
+        .map((u) => new URL(u).searchParams.get('query'));
+    requested.length = 0;
+    await t.json<DiscoverResponse>('/api/discover?q=SRE+Lead&provider=jsearch');
+    expect(jsearchQueries()).toEqual(['SRE Lead in San Francisco Bay Area']);
+    await t.json<DiscoverResponse>('/api/discover?q=SRE+Lead&provider=jsearch&where=Bay+Area');
+    expect(jsearchQueries()).toEqual(['SRE Lead in San Francisco Bay Area']);
+    await t.json<DiscoverResponse>('/api/discover?q=SRE+Lead&provider=jsearch&where=United+States');
+    expect(jsearchQueries()).toEqual(['SRE Lead']);
+    await t.json<DiscoverResponse>('/api/discover?q=SRE+Lead&provider=jsearch&remote=true');
+    expect(jsearchQueries()).toEqual(['SRE Lead']);
   });
 
   it('deletes a saved search with its hits', async () => {

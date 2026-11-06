@@ -1,8 +1,10 @@
 import type { DeepLinkGroup, SearchProfileParsed, SeniorityLevel } from '@jsp/core';
+import { canonicalPlace, findMetro, isRemotePlace } from '../locations';
 
 /**
  * Pre-filled search URLs on LinkedIn Jobs, Indeed and Google Jobs for each title x location in the
- * profile (US-wide when no location). Plain links the user opens; no API, no scraping.
+ * profile (US-wide when no location). Plain links the user opens; no API, no scraping. A metro
+ * ("San Francisco Bay Area") uses each site's own way of naming the region.
  */
 
 const LINKEDIN_LEVEL: Record<SeniorityLevel, string> = {
@@ -33,8 +35,13 @@ export function buildDeepLinks(
     'titles' | 'locations' | 'workMode' | 'seniority' | 'postedWithinDays'
   >,
 ): DeepLinkGroup[] {
-  const remote = profile.workMode === 'remote' || profile.locations.some((l) => /remote/i.test(l));
-  const places = profile.locations.filter((l) => !/remote/i.test(l));
+  const remote = profile.workMode === 'remote' || profile.locations.some(isRemotePlace);
+  const places: (string | null)[] = [];
+  for (const l of profile.locations) {
+    if (isRemotePlace(l)) continue;
+    const place = canonicalPlace(l);
+    if (!places.includes(place)) places.push(place);
+  }
   const targets: { title: string; place: string | null; remote: boolean }[] = [];
   for (const title of profile.titles) {
     for (const place of places) targets.push({ title, place, remote: false });
@@ -47,8 +54,14 @@ export function buildDeepLinks(
 
   const linkedin = picked.map((t) => {
     const u = new URL('https://www.linkedin.com/jobs/search/');
+    const metro = t.place ? findMetro(t.place) : null;
     u.searchParams.set('keywords', t.title);
-    u.searchParams.set('location', t.place ?? 'United States');
+    u.searchParams.set(
+      'location',
+      metro?.providers.linkedin.location ?? t.place ?? 'United States',
+    );
+    const geoId = metro?.providers.linkedin.geoId;
+    if (geoId) u.searchParams.set('geoId', geoId);
     u.searchParams.set('f_TPR', `r${days * 86_400}`);
     if (t.remote) u.searchParams.set('f_WT', '2');
     else if (profile.workMode === 'hybrid') u.searchParams.set('f_WT', '3');
@@ -59,8 +72,9 @@ export function buildDeepLinks(
 
   const indeed = picked.map((t) => {
     const u = new URL('https://www.indeed.com/jobs');
+    const metro = t.place ? findMetro(t.place) : null;
     u.searchParams.set('q', t.title);
-    u.searchParams.set('l', t.place ?? 'United States');
+    u.searchParams.set('l', metro?.providers.indeed ?? t.place ?? 'United States');
     u.searchParams.set('fromage', String(Math.min(days, 14)));
     if (t.remote) u.searchParams.set('remotejob', INDEED_REMOTE);
     return { label: label(t), url: u.toString() };
@@ -68,7 +82,12 @@ export function buildDeepLinks(
 
   const google = picked.map((t) => {
     const u = new URL('https://www.google.com/search');
-    const where = t.place ?? (t.remote ? 'remote' : 'United States');
+    const metro = t.place ? findMetro(t.place) : null;
+    const where = t.place
+      ? `in ${metro?.providers.google ?? t.place}`
+      : t.remote
+        ? 'remote'
+        : 'United States';
     u.searchParams.set('q', `${t.title} jobs ${where}`);
     u.searchParams.set('ibp', 'htl;jobs');
     u.searchParams.set('htichips', `date_posted:${GOOGLE_DATE[days] ?? 'week'}`);

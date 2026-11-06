@@ -1,4 +1,10 @@
-import type { ApplicationDetail, DiscoverItem, DiscoverResponse, SearchProvider } from '@jsp/core';
+import {
+  type ApplicationDetail,
+  DEFAULT_SEARCH_LOCATION,
+  type DiscoverItem,
+  type DiscoverResponse,
+  type SearchProvider,
+} from '@jsp/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Search } from 'lucide-react';
 import { useState } from 'react';
@@ -89,7 +95,12 @@ function Result({ item }: { item: DiscoverItem }) {
 }
 
 export function Discover() {
-  const [form, setForm] = useState({ q: '', where: '', remote: false, provider: 'all' });
+  const [form, setForm] = useState({
+    q: '',
+    where: DEFAULT_SEARCH_LOCATION,
+    remote: false,
+    provider: 'all',
+  });
   const [query, setQuery] = useState<typeof form | null>(null);
   const [page, setPage] = useState(1);
   const { data, error, isFetching } = useQuery({
@@ -105,7 +116,7 @@ export function Discover() {
     <>
       <PageHeader
         title="Discover"
-        subtitle="Keyword search across job sources, US-first. For searches built from your resume, use Job Match."
+        subtitle={`Keyword search across job sources, US-first. Default: ${DEFAULT_SEARCH_LOCATION}; “United States” searches the whole country. For searches built from your resume, use Job Match.`}
       />
       <Card>
         <form
@@ -125,10 +136,11 @@ export function Discover() {
             required
           />
           <Input
-            placeholder="City, state or ZIP (optional)"
+            placeholder={`City, state or ZIP (default: ${DEFAULT_SEARCH_LOCATION})`}
             value={form.where}
             onChange={(e) => setForm({ ...form, where: e.target.value })}
             aria-label="Where"
+            title={`Default: ${DEFAULT_SEARCH_LOCATION}. “United States” searches the whole country.`}
           />
           <Select
             aria-label="Source"

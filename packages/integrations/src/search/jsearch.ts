@@ -1,6 +1,7 @@
 import { type JobSource, jobInputSchema, type SeniorityLevel } from '@jsp/core';
 import { UpstreamError } from '../errors';
 import { asArray, clip, type FetchOptions, getJson, num, str } from '../http';
+import { findMetro } from '../locations';
 import { analyzeJobUrl } from '../url';
 import type { SearchResult, SearchResultItem } from './types';
 
@@ -100,7 +101,10 @@ export async function searchJSearch(
   opts: FetchOptions = {},
 ): Promise<SearchResult> {
   const host = params.host?.trim() || 'jsearch.p.rapidapi.com';
-  const query = params.location ? `${params.query} in ${params.location}` : params.query;
+  const place = params.location?.trim()
+    ? (findMetro(params.location)?.providers.jsearch ?? params.location.trim())
+    : null;
+  const query = place ? `${params.query} in ${place}` : params.query;
   const q = new URLSearchParams({
     query,
     page: String(params.page ?? 1),

@@ -1,6 +1,7 @@
 import { jobInputSchema } from '@jsp/core';
 import { UpstreamError } from '../errors';
 import { asArray, clip, type FetchOptions, getJson, num, str } from '../http';
+import { findMetro } from '../locations';
 import type { SearchResult, SearchResultItem } from './types';
 
 export interface UsaJobsSearchParams {
@@ -8,7 +9,10 @@ export interface UsaJobsSearchParams {
   /** The email address the API key was registered with (USAJOBS requires it as User-Agent). */
   userAgent: string;
   keyword: string;
+  /** "City, State"; a metro ("San Francisco Bay Area") becomes its main city plus a radius. */
   location?: string | null;
+  /** USAJOBS `Radius` around `location`, in miles. */
+  radiusMiles?: number;
   remote?: boolean;
   page?: number;
   resultsPerPage?: number;
@@ -45,7 +49,14 @@ export async function searchUsaJobs(
     ResultsPerPage: String(params.resultsPerPage ?? 25),
     Page: String(params.page ?? 1),
   });
-  if (params.location) q.set('LocationName', params.location);
+  const metro = params.location ? findMetro(params.location) : null;
+  if (metro) {
+    q.set('LocationName', metro.providers.usajobs.locationName);
+    q.set('Radius', String(params.radiusMiles ?? metro.providers.usajobs.radiusMiles));
+  } else if (params.location) {
+    q.set('LocationName', params.location);
+    if (params.radiusMiles) q.set('Radius', String(params.radiusMiles));
+  }
   if (params.remote) q.set('RemoteIndicator', 'True');
   if (params.postedWithinDays) q.set('DatePosted', String(Math.min(60, params.postedWithinDays)));
   const data = await getJson<{

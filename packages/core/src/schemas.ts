@@ -240,7 +240,11 @@ export const boardCreateSchema = z
 
 export const discoverQuerySchema = z.object({
   q: z.string().trim().min(1).max(200),
-  /** City, state or ZIP, e.g. "Austin, TX". Empty = anywhere in the country. */
+  /**
+   * City, state, ZIP or metro, e.g. "Austin, TX" or "San Francisco Bay Area". Empty = the default
+   * place (DEFAULT_SEARCH_LOCATION), or anywhere in the country when `remote` is true.
+   * "United States" = anywhere in the country.
+   */
   where: z.string().trim().max(200).optional(),
   page: z.coerce.number().int().min(1).max(50).default(1),
   /** `all` queries every configured provider and merges the results. */
@@ -258,8 +262,12 @@ export const searchProfileSchema = z.object({
   titles: shortList(8).min(1),
   /** Skills, tools and certifications used for fit scoring (e.g. "HRIS", "Workday", "PHR"). */
   skills: shortList(40),
-  /** US locations: "Austin, TX", "Remote", ZIP codes. Empty = anywhere in the US. */
-  locations: shortList(5, 120),
+  /**
+   * US locations: "Austin, TX", "San Francisco Bay Area" (a metro covers its cities), "Remote",
+   * ZIP codes, "United States" (anywhere in the US). Saving a search with none stores the default
+   * place (DEFAULT_SEARCH_LOCATION); a stored empty list means anywhere in the US.
+   */
+  locations: shortList(5, 120).default([]),
   workMode: z.enum(WORK_MODES).default('any'),
   seniority: z.enum(SENIORITY_LEVELS).nullish(),
   /** Extra words that should appear (industry, domain). */

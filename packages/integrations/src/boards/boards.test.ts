@@ -262,6 +262,52 @@ describe('board clients', () => {
   });
 });
 
+describe('search clients: the San Francisco Bay Area', () => {
+  const empty = [
+    { match: 'api.adzuna.com', body: { count: 0, results: [] } },
+    { match: 'data.usajobs.gov', body: { SearchResult: { SearchResultItems: [] } } },
+    { match: 'jsearch.p.rapidapi.com', body: { status: 'OK', data: [] } },
+  ];
+
+  it('JSearch asks for "<title> in San Francisco Bay Area"', async () => {
+    const seen: { url: string; headers: Headers }[] = [];
+    await searchJSearch(
+      { apiKey: 'k', query: 'SRE lead', location: 'Bay Area' },
+      { fetch: fakeFetch(empty, seen) },
+    );
+    expect(new URL(seen[0]?.url ?? '').searchParams.get('query')).toBe(
+      'SRE lead in San Francisco Bay Area',
+    );
+  });
+
+  it('Adzuna searches around San Francisco with a radius in km', async () => {
+    const seen: { url: string; headers: Headers }[] = [];
+    await searchAdzuna(
+      { appId: 'id', appKey: 'key', what: 'incident manager', where: 'San Francisco Bay Area' },
+      { fetch: fakeFetch(empty, seen) },
+    );
+    const u = new URL(seen[0]?.url ?? '');
+    expect(u.searchParams.get('where')).toBe('San Francisco');
+    expect(u.searchParams.get('distance')).toBe('80');
+  });
+
+  it('USAJOBS searches around San Francisco, California with a radius in miles', async () => {
+    const seen: { url: string; headers: Headers }[] = [];
+    await searchUsaJobs(
+      {
+        apiKey: 'k',
+        userAgent: 'a@example.com',
+        keyword: 'it specialist',
+        location: 'SF Bay Area',
+      },
+      { fetch: fakeFetch(empty, seen) },
+    );
+    const u = new URL(seen[0]?.url ?? '');
+    expect(u.searchParams.get('LocationName')).toBe('San Francisco, California');
+    expect(u.searchParams.get('Radius')).toBe('50');
+  });
+});
+
 describe('search clients', () => {
   it('Adzuna: US index, actual salaries only', async () => {
     const seen: { url: string; headers: Headers }[] = [];

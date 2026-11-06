@@ -5,6 +5,7 @@ export * from './fit';
 export * from './http';
 export * from './imports';
 export * from './jobposting';
+export * from './locations';
 export * from './match';
 export * from './search/adzuna';
 export * from './search/dedupe';

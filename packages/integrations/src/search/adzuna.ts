@@ -1,6 +1,7 @@
 import { jobInputSchema } from '@jsp/core';
 import { UpstreamError } from '../errors';
 import { asArray, clip, type FetchOptions, getJson, num, str } from '../http';
+import { findMetro } from '../locations';
 import { htmlToText } from '../text';
 import type { SearchResult, SearchResultItem } from './types';
 
@@ -10,7 +11,10 @@ export interface AdzunaSearchParams {
   /** ISO 3166-1 alpha-2, lower case. Default "us". */
   country?: string;
   what: string;
+  /** A place; a metro ("San Francisco Bay Area") becomes its main city plus a radius. */
   where?: string | null;
+  /** Adzuna `distance`: kilometres from the centre of `where`. */
+  distanceKm?: number;
   page?: number;
   resultsPerPage?: number;
   /** Only postings newer than this many days (Adzuna `max_days_old`). */
@@ -56,7 +60,14 @@ export async function searchAdzuna(
     results_per_page: String(params.resultsPerPage ?? 20),
     'content-type': 'application/json',
   });
-  if (params.where) q.set('where', params.where);
+  const metro = params.where ? findMetro(params.where) : null;
+  if (metro) {
+    q.set('where', metro.providers.adzuna.where);
+    q.set('distance', String(params.distanceKm ?? metro.providers.adzuna.distanceKm));
+  } else if (params.where) {
+    q.set('where', params.where);
+    if (params.distanceKm) q.set('distance', String(params.distanceKm));
+  }
   if (params.maxDaysOld) q.set('max_days_old', String(params.maxDaysOld));
   const url = `https://api.adzuna.com/v1/api/jobs/${encodeURIComponent(country)}/search/${params.page ?? 1}?${q}`;
   const data = await getJson<{ count?: number; results?: unknown }>(url, opts, {}, 'Adzuna');

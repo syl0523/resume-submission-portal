@@ -1,5 +1,6 @@
 import type { FitFlag, JobFit, JobInputParsed, SearchProfileParsed } from '@jsp/core';
-import { normalizeForCompare, normalizeTitle, similarity } from './text';
+import { isNationwide, isRemotePlace, matchPlace } from './locations';
+import { normalizeTitle, similarity } from './text';
 
 export type FitJob = Pick<
   JobInputParsed,
@@ -89,88 +90,6 @@ const SENIOR_TITLE =
 const JUNIOR_TITLE = /\b(intern|internship|junior|jr|entry[- ]level|graduate|trainee)\b/i;
 
 /**
- * Metro areas a search can name as one place, with the cities inside them. Only names that are
- * not also well-known places elsewhere (no Dublin, Richmond, Cambridge or Newark).
- */
-const METROS: [RegExp, string[]][] = [
-  [
-    /\b(sf )?bay area\b|\bsilicon valley\b/,
-    [
-      'san francisco',
-      'oakland',
-      'berkeley',
-      'emeryville',
-      'alameda',
-      'san jose',
-      'santa clara',
-      'sunnyvale',
-      'mountain view',
-      'palo alto',
-      'menlo park',
-      'redwood city',
-      'redwood shores',
-      'san mateo',
-      'foster city',
-      'burlingame',
-      'san bruno',
-      'millbrae',
-      'san carlos',
-      'brisbane',
-      'daly city',
-      'cupertino',
-      'milpitas',
-      'fremont',
-      'hayward',
-      'pleasanton',
-      'livermore',
-      'san ramon',
-      'walnut creek',
-      'los gatos',
-      'campbell',
-      'los altos',
-      'san rafael',
-      'novato',
-      'bay area',
-      'silicon valley',
-    ],
-  ],
-  [
-    /\bnew york city\b|\bnyc\b|\bnew york metro/,
-    [
-      'new york',
-      'nyc',
-      'manhattan',
-      'brooklyn',
-      'queens',
-      'bronx',
-      'long island city',
-      'jersey city',
-      'hoboken',
-    ],
-  ],
-  [
-    /\b(greater )?seattle area\b|\bpuget sound\b/,
-    ['seattle', 'bellevue', 'redmond', 'kirkland', 'bothell'],
-  ],
-];
-
-/**
- * What a place in a search names: a metro's cities, else the city before the first comma, plus the
- * two-letter state after it ("Austin, TX" → austin + tx). A lone state code names the state.
- */
-function placeMatcher(place: string): { names: string[]; state: string | null } {
-  const norm = normalizeForCompare(place);
-  for (const [re, cities] of METROS) if (re.test(norm)) return { names: cities, state: null };
-  const [cityPart = '', ...rest] = place.split(',');
-  const city = normalizeForCompare(cityPart);
-  const stateToken = rest.map((r) => r.trim()).find((r) => /^[a-z]{2}$/i.test(r));
-  const state = stateToken ? stateToken.toLowerCase() : null;
-  if (rest.length === 0 && /^[a-z]{2}$/.test(city)) return { names: [], state: city };
-  if (!city || /^\d{5}$/.test(city)) return { names: [], state };
-  return { names: [city], state };
-}
-
-/**
  * Deterministic resume-to-job fit, 0-100 (KAN-41): title similarity to the target titles (40),
  * skill coverage in the posting text (30), work mode and location (15), freshness (10) and the
  * salary floor (5). Work-authorization language is flagged, and rules the posting out when the
@@ -224,10 +143,12 @@ export function scoreJobFit(
   }
 
   // Work mode and location (15)
-  const wantsRemote =
-    profile.workMode === 'remote' || profile.locations.some((l) => /remote/i.test(l));
+  const wantsRemote = profile.workMode === 'remote' || profile.locations.some(isRemotePlace);
   const acceptsRemote = wantsRemote || profile.workMode === 'any';
-  const places = profile.locations.filter((l) => !/remote/i.test(l));
+  const places = profile.locations.filter((l) => !isRemotePlace(l) && !isNationwide(l));
+  // "United States" in the list: anywhere in the US is acceptable, the named places preferred.
+  const usWide = job.remoteType === 'unknown' ? 0.6 : 0.8;
+  const anywhere = places.length === 0 || profile.locations.some(isNationwide);
   let placeFit = 0.5;
   if (job.remoteType === 'remote' && acceptsRemote) {
     placeFit = 1;
@@ -235,23 +156,20 @@ export function scoreJobFit(
   } else if (profile.workMode === 'remote' && job.remoteType === 'onsite') {
     placeFit = 0;
   } else if (places.length === 0) {
-    placeFit = job.remoteType === 'unknown' ? 0.6 : 0.8;
+    placeFit = usWide;
   } else if (job.location) {
-    // Whole places, not single words: "New York" must not match "New Orleans", and "San
-    // Francisco Bay Area" must match "San Jose, CA" but not "San Diego, CA".
-    const where = normalizeForCompare(job.location);
-    const has = (name: string) => new RegExp(`\\b${escapeRe(name)}\\b`).test(where);
-    const matchers = places.map(placeMatcher);
-    if (matchers.some((m) => m.names.some(has))) {
+    // Whole places, not single words (locations.ts): "San Francisco Bay Area" covers "San Jose, CA"
+    // but not "San Diego, CA"; "New York" does not match "New Orleans".
+    const fits = places.map((p) => matchPlace(p, job.location ?? ''));
+    if (fits.includes('match')) {
       placeFit = 1;
       reasons.push(`In ${job.location}`);
-    } else if (matchers.some((m) => m.state !== null && has(m.state))) {
-      placeFit = 0.5;
-    } else if (matchers.every((m) => m.names.length === 0 && m.state === null)) {
+    } else if (fits.includes('same_state') || fits.every((f) => f === 'unknown')) {
       placeFit = 0.5;
     } else {
       placeFit = 0.2;
     }
+    if (anywhere && placeFit < 1) placeFit = Math.max(placeFit, usWide);
   }
   if (profile.workMode === 'hybrid' && job.remoteType === 'hybrid')
     placeFit = Math.max(placeFit, 0.9);

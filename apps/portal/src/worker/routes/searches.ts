@@ -1,13 +1,16 @@
 import {
+  DEFAULT_SEARCH_LOCATION,
   draftFromResumeSchema,
   type ListResponse,
   listHitsQuerySchema,
   runSearchSchema,
+  type SavedSearchDraft,
   type SearchHit,
   savedSearchSchema,
   saveHitSchema,
+  withDefaultLocation,
 } from '@jsp/core';
-import { buildDeepLinks } from '@jsp/integrations';
+import { buildDeepLinks, isRemotePlace } from '@jsp/integrations';
 import { and, count, desc, eq, gte, type SQL } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { z } from 'zod';
@@ -38,7 +41,8 @@ function searchValues(body: SavedSearchInput) {
     resumeId: body.resumeId ?? null,
     titles: body.titles,
     skills: body.skills,
-    locations: body.locations,
+    // No place given → the default (San Francisco Bay Area, KAN-65).
+    locations: withDefaultLocation(body.locations),
     workMode: body.workMode,
     seniority: body.seniority ?? null,
     keywords: body.keywords,
@@ -91,7 +95,13 @@ searchRoutes.post('/', validate('json', savedSearchSchema), async (c) => {
 searchRoutes.post('/draft-from-resume', validate('json', draftFromResumeSchema), async (c) => {
   requireAi(c.env);
   const resume = await getResumeRow(c.var.db, c.var.user.id, c.req.valid('json').resumeId);
-  return c.json(await draftSearchFromResume(c.env, resume));
+  const draft = await draftSearchFromResume(c.env, resume);
+  // A draft with no place (or only "Remote") starts from the default place (KAN-65).
+  const hasPlace = draft.locations.some((l) => !isRemotePlace(l));
+  const body: SavedSearchDraft = hasPlace
+    ? draft
+    : { ...draft, locations: [DEFAULT_SEARCH_LOCATION, ...draft.locations].slice(0, 5) };
+  return c.json(body);
 });
 
 searchRoutes.post('/hits/:hitId/save', validate('json', saveHitSchema), async (c) => {

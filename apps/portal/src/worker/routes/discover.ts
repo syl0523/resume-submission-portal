@@ -1,5 +1,10 @@
-import { type DiscoverResponse, discoverQuerySchema, SEARCH_PROVIDERS } from '@jsp/core';
-import { analyzeJobUrl, dedupeJobs } from '@jsp/integrations';
+import {
+  DEFAULT_SEARCH_LOCATION,
+  type DiscoverResponse,
+  discoverQuerySchema,
+  SEARCH_PROVIDERS,
+} from '@jsp/core';
+import { analyzeJobUrl, canonicalPlace, dedupeJobs } from '@jsp/integrations';
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { validate } from '../lib/validate';
@@ -12,6 +17,9 @@ export const discoverRoutes = new Hono<AppEnv>().get(
   async (c) => {
     const q = c.req.valid('query');
     const providers = q.provider === 'all' ? SEARCH_PROVIDERS : [q.provider];
+    // Empty `where`: the default place (KAN-65), unless the search is remote-only (US-wide).
+    // "United States" searches the whole country; a metro alias becomes the metro's name.
+    const where = q.where ? canonicalPlace(q.where) : q.remote ? null : DEFAULT_SEARCH_LOCATION;
     const [{ items, outcomes }, saved] = await Promise.all([
       fanOut(
         c.var.db,
@@ -20,7 +28,7 @@ export const discoverRoutes = new Hono<AppEnv>().get(
         [
           {
             title: q.q,
-            location: q.where ?? null,
+            location: where,
             remote: q.remote ?? false,
             postedWithinDays: 30,
             page: q.page,
