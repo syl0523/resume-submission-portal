@@ -5,9 +5,10 @@
 A personal portal for a US-focused job search:
 
 1. **Find** fitting jobs from your resume: saved searches (tracks) drafted by AI from a resume, run across
-   LinkedIn, Indeed and company sites (via the JSearch aggregator of Google for Jobs), Adzuna US, USAJOBS and
-   watched company boards; deduped across sites, flagged for sponsorship/clearance language, ranked by a
-   resume-fit score, refreshed daily with "new since yesterday".
+   LinkedIn, Indeed and company sites (via the JSearch aggregator of Google for Jobs), Adzuna US, USAJOBS,
+   The Muse, big-tech careers sites and ATS boards (Claude web search) and watched company boards; San
+   Francisco Bay Area by default; deduped across sites, flagged for sponsorship/clearance language, ranked by
+   a resume-fit score, refreshed daily with "new since yesterday".
 2. **Apply** with assisted apply: a browser extension saves any posting in one click (with its fit score) and
    autofills company application forms (Greenhouse, Lever, Ashby) from a full profile (work history,
    education, saved answers) for you to review and submit; AI drafts answers to open questions.
@@ -46,6 +47,7 @@ flowchart LR
     J[JSearch: LinkedIn, Indeed, company sites]
     Z[Adzuna US]
     U[USAJOBS]
+    T[The Muse]
     G[Greenhouse / Lever / Ashby / SmartRecruiters]
     AI[Claude API, or Workers AI without a key]
   end
@@ -56,8 +58,8 @@ flowchart LR
   C --> W
   W --> D
   W --> R
-  W --> J & Z & U & G
-  W -. optional .-> AI
+  W --> J & Z & U & T & G
+  W -. AI, web search .-> AI
 ```
 
 One Worker, three entry points:
@@ -187,21 +189,24 @@ Built in v1 (this release):
 | Resume submission | Immutable resume versions, full autofill profile drafted from the resume, ATS autofill, AI answers to application questions, AI fit report and cover letter                                   |
 | Tracking          | Email-driven status, Inbox review, LinkedIn history import, interview calendar feed, follow-up dates, dashboard, CSV export                                                                   |
 
+Added 2026-11-05: The Muse (keyless) and Claude web search over big-tech careers sites and ATS boards as
+search sources (KAN-66, KAN-63), San Francisco Bay Area as the default place (KAN-65), Workers AI when no
+Anthropic key is set (KAN-67), and a daily board sync that scales to dozens of watched boards (KAN-68).
+
 Next (Jira epic "Phase 2"):
 
-| Feature                                                                     | Why                                                                                        |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Workday and iCIMS autofill                                                  | Most common enterprise ATSs in the US; longest forms                                       |
-| Referral finder (LinkedIn Connections.csv from the data export)             | "You know 2 people at Acme": referrals beat cold applications                              |
-| Tailored resume file per job (DOCX/PDF)                                     | One-click truthful tailoring of bullets and summary to the posting                         |
-| Follow-up email drafts                                                      | Turn due follow-ups into a ready-to-send note                                              |
-| Interview prep                                                              | Likely questions and STAR stories from the posting and your history                        |
-| Offer comparison                                                            | Base, bonus, equity, benefits, remote, cost of living side by side                         |
-| Daily email digest                                                          | New hits and due follow-ups each morning (Email Routing can send to your verified address) |
-| Company insights                                                            | H-1B/LCA sponsorship history (public DOL data), size, recent news                          |
-| Background jobs on Queues/Workflows                                         | Retries and no request-path limits for search runs, digests and imports                    |
-| Playwright end-to-end tests in CI                                           | Catch UI regressions across the main flows                                                 |
-| Direct mailbox connection (Graph, Gmail)                                    | Alternative to forwarding rules                                                            |
-| PWA + bilingual (English/Chinese) UI                                        | Phone use; Chinese-language interface                                                      |
-| Web search source for Job Match (Claude web search on company career pages) | Finds openings that the search APIs miss, as the first smoke run did by hand               |
-| Demo mode (fictional data, no backend)                                      | Show the portal to others without signing in                                               |
+| Feature                                                         | Why                                                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Workday and iCIMS autofill                                      | Most common enterprise ATSs in the US; longest forms                                       |
+| Referral finder (LinkedIn Connections.csv from the data export) | "You know 2 people at Acme": referrals beat cold applications                              |
+| Tailored resume file per job (DOCX/PDF)                         | One-click truthful tailoring of bullets and summary to the posting                         |
+| Follow-up email drafts                                          | Turn due follow-ups into a ready-to-send note                                              |
+| Interview prep                                                  | Likely questions and STAR stories from the posting and your history                        |
+| Offer comparison                                                | Base, bonus, equity, benefits, remote, cost of living side by side                         |
+| Daily email digest                                              | New hits and due follow-ups each morning (Email Routing can send to your verified address) |
+| Company insights                                                | H-1B/LCA sponsorship history (public DOL data), size, recent news                          |
+| Background jobs on Queues/Workflows                             | Retries and no request-path limits for search runs, digests and imports                    |
+| Playwright end-to-end tests in CI                               | Catch UI regressions across the main flows                                                 |
+| Direct mailbox connection (Graph, Gmail)                        | Alternative to forwarding rules                                                            |
+| PWA + bilingual (English/Chinese) UI                            | Phone use; Chinese-language interface                                                      |
+| Demo mode (fictional data, no backend)                          | Show the portal to others without signing in                                               |

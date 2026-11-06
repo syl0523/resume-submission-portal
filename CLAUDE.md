@@ -6,13 +6,13 @@ company application forms. See `docs/architecture.md` for the why, `docs/api.md`
 
 ## Layout
 
-| Path                     | What                                                                               | Runtime                            |
-| ------------------------ | ---------------------------------------------------------------------------------- | ---------------------------------- |
-| `packages/core`          | Enums, Zod request schemas, response types, status engine                          | anywhere                           |
-| `packages/integrations`  | Pure logic: URL analysis, email classification, CSV import, board + Adzuna clients | anywhere (no DOM, no Workers APIs) |
-| `apps/portal/src/worker` | Hono API, email + cron handlers, Drizzle/D1, R2                                    | Cloudflare Workers                 |
-| `apps/portal/src/client` | React 19 SPA                                                                       | browser                            |
-| `apps/extension`         | Chrome MV3 extension (esbuild)                                                     | browser                            |
+| Path                     | What                                                                             | Runtime                            |
+| ------------------------ | -------------------------------------------------------------------------------- | ---------------------------------- |
+| `packages/core`          | Enums, Zod request schemas, response types, status engine                        | anywhere                           |
+| `packages/integrations`  | Pure logic: URL analysis, email classification, CSV import, search/board clients | anywhere (no DOM, no Workers APIs) |
+| `apps/portal/src/worker` | Hono API, email + cron handlers, Drizzle/D1, R2                                  | Cloudflare Workers                 |
+| `apps/portal/src/client` | React 19 SPA                                                                     | browser                            |
+| `apps/extension`         | Chrome MV3 extension (esbuild)                                                   | browser                            |
 
 ## Commands
 

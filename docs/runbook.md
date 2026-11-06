@@ -108,7 +108,8 @@ it, and never autofills LinkedIn or Indeed.
 | JSearch   | rapidapi.com → JSearch → Subscribe (free tier) | Covers LinkedIn, Indeed, Glassdoor, ZipRecruiter and company sites via Google for Jobs |
 | Adzuna    | developer.adzuna.com                           | `app_id` + `app_key`; US index by default (`ADZUNA_COUNTRY=us`)                        |
 | USAJOBS   | developer.usajobs.gov → API request            | Key is emailed; `USAJOBS_USER_AGENT` must be that email                                |
-| Anthropic | console.anthropic.com                          | Claude for resume drafts, fit reports, answers and email second opinion (optional)     |
+| Anthropic | console.anthropic.com                          | Claude AI, plus the web search source (big-tech careers sites); optional               |
+| The Muse  | none                                           | Keyless search source, always on                                                       |
 
 AI works without any key: when `ANTHROPIC_API_KEY` is not set, the Workers AI binding (`AI` in
 `wrangler.jsonc`) runs every AI feature on your Cloudflare account with `AI_MODEL_WORKERS` (default

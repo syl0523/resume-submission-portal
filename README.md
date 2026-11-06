@@ -6,9 +6,10 @@ stands, without handing your LinkedIn or Indeed account to a bot.
 ## What it does
 
 - **Job Match.** Saved searches drafted from your resume, run across LinkedIn, Indeed and company sites
-  (JSearch / Google for Jobs), Adzuna US, USAJOBS and the company boards you watch. Duplicates merged, every
-  posting scored for fit, sponsorship and clearance language flagged, new postings highlighted daily. One-click
-  pre-filled LinkedIn, Indeed and Google Jobs searches work even with no API keys.
+  (JSearch / Google for Jobs), Adzuna US, USAJOBS, The Muse, big-tech careers sites (Claude web search) and the
+  company boards you watch. San Francisco Bay Area by default. Duplicates merged, every posting scored for fit,
+  sponsorship and clearance language flagged, new postings highlighted daily. One-click pre-filled LinkedIn,
+  Indeed and Google Jobs searches work even with no API keys.
 - **Assisted apply.** A Chrome extension saves any job page in one click with its fit score, and autofills
   Greenhouse, Lever and Ashby forms from your profile and resume for you to review and submit. AI drafts
   answers to open questions.
@@ -20,18 +21,20 @@ stands, without handing your LinkedIn or Indeed account to a bot.
 
 ## Status
 
-Phase 1 is live on Cloudflare behind Cloudflare Access sign-in; search keys and email forwarding are next. As of November 2026:
+Phase 1 is live on Cloudflare behind Cloudflare Access sign-in. Search and AI work with no keys (The Muse,
+watched boards, Workers AI); paid-source keys and email forwarding are next. As of November 2026:
 
-| Area                                                                   | State                                                                      |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| API, data model and status engine                                      | Done                                                                       |
-| Email forwarding and automatic tracking                                | Done                                                                       |
-| CSV and LinkedIn import, company boards, daily cron, calendar feed     | Done                                                                       |
-| Job Match: saved searches, fit scoring, duplicate merging, Discover    | Done                                                                       |
-| AI (Claude): resume drafts, fit reports, answers, email second opinion | Done                                                                       |
-| Web app                                                                | Done                                                                       |
-| Chrome extension: save with fit, mark applied, autofill, AI answers    | Done; Chrome Web Store listing later (KAN-36)                              |
-| Production on Cloudflare                                               | Live with sign-in; search keys (KAN-61) and email forwarding (KAN-62) next |
+| Area                                                                | State                                                                      |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| API, data model and status engine                                   | Done                                                                       |
+| Email forwarding and automatic tracking                             | Done                                                                       |
+| CSV and LinkedIn import, company boards, daily cron, calendar feed  | Done                                                                       |
+| Job Match: saved searches, fit scoring, duplicate merging, Discover | Done                                                                       |
+| Search sources: The Muse, Claude web search, Bay Area default       | Done (KAN-63, KAN-65, KAN-66)                                              |
+| AI: Claude, or Workers AI without a key                             | Done (KAN-67)                                                              |
+| Web app                                                             | Done                                                                       |
+| Chrome extension: save with fit, mark applied, autofill, AI answers | Done; Chrome Web Store listing later (KAN-36)                              |
+| Production on Cloudflare                                            | Live with sign-in; source keys (KAN-61) and email forwarding (KAN-62) next |
 
 Tickets are in Jira (KAN); the dated [progress log](https://roysunsyl.atlassian.net/wiki/spaces/RSP/pages/393219)
 is in Confluence.
@@ -41,8 +44,8 @@ is in Confluence.
 ```text
 Browser app ─┐                         ┌─ D1 (SQLite)  R2 (files)
 Extension  ──┼─► Cloudflare Worker ────┤
-Mail rule ───┘   API · app · email ·   └─ JSearch · Adzuna · USAJOBS · Greenhouse/Lever/Ashby · Claude
-                 daily cron
+Mail rule ───┘   API · app · email ·   └─ JSearch · Adzuna · USAJOBS · The Muse · Greenhouse/Lever/Ashby
+                 daily cron                Claude (AI + web search) or Workers AI
 ```
 
 TypeScript monorepo: `packages/core` (contract + status engine), `packages/integrations` (pure parsers and

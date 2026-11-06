@@ -20,6 +20,16 @@ resume, with a focus on US jobs.
   - Adzuna, US index: official API, broad coverage of company sites and boards.
   - USAJOBS: official US federal jobs API.
   - Watched company boards: official Greenhouse, Lever, Ashby, SmartRecruiters APIs.
+  - The Muse (added 2026-11-05, KAN-66): official public API, no key. Category-based, so postings are
+    filtered by title locally. Gives a keyless source beyond watched boards.
+  - Claude web search (added 2026-11-05, KAN-63): searches employers' own careers sites and ATS boards
+    (Google, Microsoft, Amazon, Apple, Meta, Netflix, Salesforce, Uber, Workday, Greenhouse, Lever, Ashby,
+    SmartRecruiters) through the Anthropic API's web search tool, restricted with `allowed_domains`. Covers
+    the big employers whose own careers sites have no public API. Never LinkedIn or Indeed (ADR 0002); every
+    reported URL must be on an allowed site and among the search results. Billed per search, so capped and
+    manual-only.
+- **Default place (2026-11-05, KAN-65):** the San Francisco Bay Area, as a metro that covers its cities;
+  "United States" searches the whole country.
 - **Always-available fallback:** pre-filled LinkedIn Jobs, Indeed and Google Jobs search links for every
   title x location in the profile. No keys needed.
 - **Ranking:** deterministic `scoreJobFit` (title similarity, skill coverage, work mode/location, salary
@@ -33,6 +43,7 @@ resume, with a focus on US jobs.
 
 ## Consequences
 
-- Useful with zero keys (links + boards), better with JSearch/Adzuna/USAJOBS keys, best with AI.
+- Useful with zero keys (links, boards, The Muse; AI on Workers AI), better with JSearch/Adzuna/USAJOBS keys,
+  best with an Anthropic key (Claude AI and web search).
 - Results are as fresh as each source; JSearch quota limits how often a full search can run.
 - An email digest of new hits is a follow-up (backlog); new hits show on the dashboard meanwhile.

@@ -191,15 +191,35 @@ stores its postings as hits, so the portal can show what is new.
 | `POST /api/searches/hits/:hitId/save`    | `SaveHitRequest`         | 201 `ApplicationDetail` (`capturedVia: "search"`, `fitScore` from the hit; 200 with the existing application when the job was already saved) |
 | `POST /api/searches/hits/:hitId/dismiss` | –                        | 204                                                                                                                                          |
 
+Locations (KAN-65): the default place is `DEFAULT_SEARCH_LOCATION` = "San Francisco Bay Area". Creating or
+updating a search with no locations stores it, and AI drafts with no place (or only "Remote") get it. A metro
+such as "San Francisco Bay Area" covers its cities (San Francisco, Oakland, San Jose, Palo Alto, Mountain View,
+Sunnyvale, Santa Clara, Menlo Park, Redwood City, Fremont, Berkeley, …; ambiguous names such as Dublin or
+Newark count only with CA) in fit scoring, query planning, the boards filter and deep links. "United States"
+(or "USA", "Anywhere") means anywhere in the US.
+
 How a run works (`POST /api/searches/:id/run`):
 
 1. `planQueries(criteria, maxQueries)` → title x location queries (remote flag from `workMode` or a "Remote"
    location).
 2. Fan out to every requested provider that is configured, in parallel (`Promise.allSettled`), 10 s timeout per
-   call: `jsearch` (LinkedIn, Indeed and company sites via Google for Jobs), `adzuna` (country
-   `ADZUNA_COUNTRY`, default `us`), `usajobs` (federal), `boards` (open postings on watched company boards,
-   filtered locally by title similarity). Unconfigured providers report `error: "not_configured"`; one failing
-   provider never fails the run.
+   call unless noted. Each provider gets the location in its own form (Adzuna and USAJOBS: San Francisco with a
+   radius; JSearch: the metro name):
+   - `jsearch`: LinkedIn, Indeed and company sites via Google for Jobs (`JSEARCH_API_KEY`).
+   - `adzuna`: country `ADZUNA_COUNTRY`, default `us` (`ADZUNA_APP_ID`, `ADZUNA_APP_KEY`).
+   - `usajobs`: federal jobs (`USAJOBS_API_KEY`, `USAJOBS_USER_AGENT`).
+   - `boards`: open postings on watched company boards, filtered locally by title similarity and location.
+   - `muse` (KAN-66): The Muse public API, no key. It has no keyword search, so titles map to Muse categories
+     (at most 3) and postings are kept when their title resembles a target; 2 pages per category (1 in the
+     daily cron), 15 s timeout.
+   - `websearch` (KAN-63): Claude's web search, restricted to employers' careers sites (Google, Microsoft,
+     Amazon, Apple, Meta, Netflix, Salesforce, Uber) and ATS boards (Workday, Greenhouse, Lever, Ashby,
+     SmartRecruiters); never LinkedIn or Indeed. Needs `ANTHROPIC_API_KEY` (Workers AI cannot search the
+     web). At most 2 queries per run and 3 searches per query on `AI_MODEL_FAST`, 90 s timeout. A posting is
+     kept only when its URL is on an allowed site and appeared in the search results. Manual runs only, never
+     the daily cron; leave it out of a run with `providers`.
+
+   Unconfigured providers report `error: "not_configured"`; one failing provider never fails the run.
 3. `dedupeJobs` merges the same job seen on several sites (URL key, then company + similar title + location),
    keeping the employer's own apply link and the richest description.
 4. `scoreJobFit(criteria, job)` on every posting; `needsSponsorship` turns sponsorship/citizenship/clearance
@@ -220,7 +240,10 @@ seniority, US locations, work mode and a one-line summary. The user reviews and 
 ## Discover (keyword search)
 
 `GET /api/discover` — `DiscoverQuery` → `DiscoverResponse`. Same providers as Job Match, but for one keyword
-query (`q`, `where`, `remote`, `provider=all|jsearch|adzuna|usajobs|boards`). Items are not fit-scored.
+query (`q`, `where`, `remote`, `provider=all|jsearch|adzuna|usajobs|boards|muse|websearch`). Items are not
+fit-scored. An empty `where` searches the default place (San Francisco Bay Area), or the whole US when
+`remote` is true; `where=United States` searches the whole US. `provider=all` leaves out `websearch`
+(it runs only when picked, and only on page 1).
 
 ## AI assist (optional)
 
