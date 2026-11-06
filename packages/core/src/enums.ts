@@ -119,8 +119,9 @@ export type BoardProvider = (typeof BOARD_PROVIDERS)[number];
  * - adzuna: Adzuna's US index
  * - usajobs: USAJOBS, US federal jobs (official API)
  * - boards: open postings on the company boards you watch
+ * - muse: The Muse public jobs API (no key; filtered by title locally, since it has no keyword search)
  */
-export const SEARCH_PROVIDERS = ['jsearch', 'adzuna', 'usajobs', 'boards'] as const;
+export const SEARCH_PROVIDERS = ['jsearch', 'adzuna', 'usajobs', 'boards', 'muse'] as const;
 export type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
 
 /** Work arrangement preference in a search profile. */

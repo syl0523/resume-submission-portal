@@ -30,6 +30,7 @@ const PROVIDER_LABEL: Record<SearchProvider, string> = {
   adzuna: 'Adzuna',
   usajobs: 'USAJOBS',
   boards: 'Your company boards',
+  muse: 'The Muse',
 };
 
 function Result({ item }: { item: DiscoverItem }) {
@@ -188,8 +189,8 @@ export function Discover() {
         {isFetching && !data ? <Spinner label="Searching…" /> : null}
         {data && data.items.length === 0 ? (
           <EmptyState title="No results">
-            Try broader keywords, or set up JSearch, Adzuna or USAJOBS keys on the server (Settings
-            shows what is on).
+            Try broader keywords or a job title (The Muse matches titles), or set up JSearch, Adzuna
+            or USAJOBS keys on the server (Settings shows what is on).
           </EmptyState>
         ) : null}
         {data && data.items.length > 0 ? (

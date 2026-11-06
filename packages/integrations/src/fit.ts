@@ -31,18 +31,50 @@ const TITLE_SYNONYMS: [RegExp, string][] = [
   [/\badmin\b/g, 'administrator'],
   [/\bvp\b/g, 'vice president'],
   [/\bpeople ops\b/g, 'people operations'],
+  [/\bsre\b/g, 'site reliability engineer'],
+  [/\bprod\b/g, 'production'],
+  [/\bapp\b/g, 'application'],
 ];
 
 const LEVEL_WORDS =
   /\b(senior|junior|lead|principal|staff|chief|head|entry level|entry|intern|internship|associate|i|ii|iii|iv|1|2|3)\b/g;
 
-export function titleKey(title: string): string {
+/** Normalised title with abbreviations spelled out ("Sr. SRE" → "senior site reliability engineer"). */
+export function expandTitle(title: string): string {
   let t = normalizeTitle(title);
   for (const [re, full] of TITLE_SYNONYMS) t = t.replace(re, full);
-  return t.replace(LEVEL_WORDS, ' ').replace(/\s+/g, ' ').trim();
+  return t;
 }
 
-/** 0..1: bigram similarity, or word overlap when the posting adds words ("HR Generalist II, Benefits"). */
+export function titleKey(title: string): string {
+  return expandTitle(title).replace(LEVEL_WORDS, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Families of titles that employers use for the same work. Two titles in one family are close
+ * variants (similarity at least FAMILY_SIMILARITY) even when they share no words.
+ */
+export const ROLE_FAMILIES: { id: string; pattern: RegExp }[] = [
+  {
+    // Reliability and production operations: SRE, production / application support, incidents.
+    id: 'reliability',
+    pattern:
+      /\b(site reliability|reliability engineer(ing)?|production (support|engineer(ing)?|operations)|application support|incident (manager|management|commander|coordinator|lead|response manager)|major incident)\b/,
+  },
+];
+
+const FAMILY_SIMILARITY = 0.8;
+
+/** The role family a title belongs to (see ROLE_FAMILIES), or null. */
+export function roleFamily(title: string): string | null {
+  const t = expandTitle(title);
+  return ROLE_FAMILIES.find((f) => f.pattern.test(t))?.id ?? null;
+}
+
+/**
+ * 0..1: bigram similarity, or word overlap when the posting adds words ("HR Generalist II,
+ * Benefits"); at least 0.8 for close variants in one role family ("SRE" ~ "Production Support").
+ */
 export function titleSimilarity(a: string, b: string): number {
   const x = titleKey(a);
   const y = titleKey(b);
@@ -52,7 +84,9 @@ export function titleSimilarity(a: string, b: string): number {
   const wy = new Set(y.split(' '));
   const shared = [...wy].filter((w) => wx.has(w)).length;
   const containment = wy.size > 0 ? shared / wy.size : 0;
-  return Math.max(dice, containment * 0.95);
+  const base = Math.max(dice, containment * 0.95);
+  const family = roleFamily(a);
+  return family && family === roleFamily(b) ? Math.max(base, FAMILY_SIMILARITY) : base;
 }
 
 function escapeRe(s: string): string {

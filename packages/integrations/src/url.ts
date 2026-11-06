@@ -14,7 +14,7 @@ const TRACKING_PARAM =
   /^(utm_.+|gclid|gbraid|wbraid|fbclid|msclkid|mc_cid|mc_eid|ref|refid|referrer|trk|trkinfo|trackingid|lipi|src|source|gh_src|lever-source|lever-origin|from|tk|vjs|advn|sjdu|ad|xpse|xfps|xkcb|camk|jsa|iaa|alid|ei|cmp|pos|spa|campaign|trid|se|v|feed|hl)$/i;
 
 const AGGREGATOR_HOST =
-  /(^|\.)(glassdoor\.[a-z.]+|ziprecruiter\.com|monster\.[a-z.]+|workopolis\.com|jobbank\.gc\.ca|simplyhired\.[a-z.]+|eluta\.ca|talent\.com|careerbuilder\.com)$/;
+  /(^|\.)(glassdoor\.[a-z.]+|ziprecruiter\.com|monster\.[a-z.]+|workopolis\.com|jobbank\.gc\.ca|simplyhired\.[a-z.]+|eluta\.ca|talent\.com|careerbuilder\.com|themuse\.com)$/;
 
 function keyFor(url: string): string {
   return url

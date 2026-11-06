@@ -35,6 +35,8 @@ export interface RunOptions {
   aiRerank: boolean;
   maxQueries: number;
   now?: Date;
+  /** The daily refresh (not a manual run): fewer pages, no paid AI sources. */
+  scheduled?: boolean;
 }
 
 function hitKey(job: { url?: string | null; company: string; title: string }): string {
@@ -64,7 +66,9 @@ export async function runSavedSearch(
   const queries = planQueries(criteria, opts.maxQueries);
   const providers = opts.providers ?? [...SEARCH_PROVIDERS];
 
-  const { items, outcomes } = await fanOut(db, env, userId, queries, providers);
+  const { items, outcomes } = await fanOut(db, env, userId, queries, providers, {
+    scheduled: opts.scheduled,
+  });
   const merged = dedupeJobs(items);
   const scored = merged.map((item) => ({
     ...item,
@@ -197,7 +201,12 @@ export async function refreshAlertSearches(
   let errors = 0;
   for (const search of searches) {
     try {
-      await runSavedSearch(db, env, search.userId, search, { aiRerank: false, maxQueries: 2, now });
+      await runSavedSearch(db, env, search.userId, search, {
+        aiRerank: false,
+        maxQueries: 2,
+        now,
+        scheduled: true,
+      });
       run += 1;
     } catch (err) {
       errors += 1;

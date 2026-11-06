@@ -6,6 +6,7 @@ import {
   type SearchResultItem,
   searchAdzuna,
   searchJSearch,
+  searchMuse,
   searchUsaJobs,
   titleSimilarity,
 } from '@jsp/integrations';
@@ -24,6 +25,19 @@ export interface FoundItem extends SearchResultItem {
 }
 
 const CALL_TIMEOUT_MS = 10_000;
+/** The Muse: pages per category for manual runs and Discover, and for the daily refresh. */
+const MUSE_PAGES = 2;
+const MUSE_PAGES_SCHEDULED = 1;
+const MUSE_TIMEOUT_MS = 15_000;
+
+export interface FanOutOptions {
+  /** Adzuna country index. */
+  country?: string;
+  /** The daily refresh: fewer pages, no paid AI sources. */
+  scheduled?: boolean;
+  /** Discover keyword search: sources without keyword search also match descriptions. */
+  keywordSearch?: boolean;
+}
 
 export function providerAvailability(env: Env): Record<SearchProvider, boolean> {
   return {
@@ -31,6 +45,8 @@ export function providerAvailability(env: Env): Record<SearchProvider, boolean> 
     adzuna: Boolean(env.ADZUNA_APP_ID?.trim() && env.ADZUNA_APP_KEY?.trim()),
     usajobs: Boolean(env.USAJOBS_API_KEY?.trim() && env.USAJOBS_USER_AGENT?.trim()),
     boards: true,
+    // Public API, no key (KAN-66).
+    muse: true,
   };
 }
 
@@ -85,10 +101,35 @@ export async function fanOut(
   userId: string,
   queries: SearchQuery[],
   providers: readonly SearchProvider[],
-  opts: { country?: string } = {},
+  opts: FanOutOptions = {},
 ): Promise<{ items: FoundItem[]; outcomes: ProviderOutcome[] }> {
   const available = providerAvailability(env);
   const fetchImpl = outboundFetch(env);
+
+  // The Muse has no keyword search: one call covers every title and place (bounded pages).
+  const museCall = (): Promise<SearchResult> => {
+    const pages = opts.scheduled ? MUSE_PAGES_SCHEDULED : MUSE_PAGES;
+    const firstPage = Math.max(1, queries[0]?.page ?? 1);
+    const places = [...new Set(queries.filter((q) => !q.remote).map((q) => q.location ?? null))];
+    return searchMuse(
+      {
+        titles: [...new Set(queries.map((q) => q.title))],
+        places,
+        remote: queries.some((q) => q.remote),
+        seniority: queries[0]?.seniority ?? null,
+        page: (firstPage - 1) * pages,
+        maxPages: pages,
+        matchDescription: opts.keywordSearch === true,
+      },
+      { fetch: fetchImpl, signal: AbortSignal.timeout(MUSE_TIMEOUT_MS) },
+    );
+  };
+
+  const callsFor = (provider: SearchProvider): (() => Promise<SearchResult>)[] => {
+    if (provider === 'muse') return [museCall];
+    return queries.map((q) => () => call(provider, q));
+  };
+
   const call = (provider: SearchProvider, q: SearchQuery): Promise<SearchResult> => {
     const signal = AbortSignal.timeout(CALL_TIMEOUT_MS);
     switch (provider) {
@@ -134,6 +175,8 @@ export async function fanOut(
         );
       case 'boards':
         return searchBoards(db, userId, [q]);
+      case 'muse':
+        return museCall();
     }
   };
 
@@ -146,7 +189,7 @@ export async function fanOut(
           outcome: { provider, total: 0, error: 'not_configured' },
         };
       }
-      const settled = await Promise.allSettled(queries.map((q) => call(provider, q)));
+      const settled = await Promise.allSettled(callsFor(provider).map((run) => run()));
       const ok = settled.filter(
         (s): s is PromiseFulfilledResult<SearchResult> => s.status === 'fulfilled',
       );

@@ -35,7 +35,7 @@ export const discoverRoutes = new Hono<AppEnv>().get(
           },
         ],
         providers,
-        { country: q.country },
+        { country: q.country, keywordSearch: true },
       ),
       applicationIndex(c.var.db, c.var.user.id),
     ]);

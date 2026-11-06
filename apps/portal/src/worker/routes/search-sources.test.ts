@@ -1,4 +1,10 @@
-import type { Resume, SavedSearchDraft } from '@jsp/core';
+import type {
+  DiscoverResponse,
+  Resume,
+  RunSearchResponse,
+  SavedSearch,
+  SavedSearchDraft,
+} from '@jsp/core';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestContext, jsonBody, type TestContext } from '../test/harness';
 
@@ -37,8 +43,38 @@ const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       ? json(reply)
       : json({ type: 'error', error: { type: 'api_error', message: 'no reply queued' } }, 500);
   }
+  if (url.startsWith('https://www.themuse.com/api/public/jobs')) {
+    const category = new URL(url).searchParams.get('category');
+    return json({
+      page: Number(new URL(url).searchParams.get('page')),
+      page_count: 1,
+      total: 2,
+      results: category === 'Software Engineering' ? MUSE_RESULTS : [],
+    });
+  }
   return new Response('{}', { status: 404 });
 }) as typeof fetch;
+
+const MUSE_RESULTS = [
+  {
+    id: 7001,
+    name: 'Production Support Lead',
+    contents: '<p>Lead incident response for payments. PagerDuty, Splunk.</p>',
+    publication_date: new Date(Date.now() - 86_400_000).toISOString(),
+    locations: [{ name: 'Charlotte, NC' }, { name: 'San Francisco, CA' }],
+    refs: { landing_page: 'https://www.themuse.com/jobs/examplebank/production-support-lead' },
+    company: { name: 'Example Bank' },
+  },
+  {
+    id: 7002,
+    name: 'Account Executive',
+    contents: '<p>Sell things.</p>',
+    publication_date: new Date().toISOString(),
+    locations: [{ name: 'Oakland, CA' }],
+    refs: { landing_page: 'https://www.themuse.com/jobs/contoso/account-executive' },
+    company: { name: 'Contoso' },
+  },
+];
 
 const PDF = new TextEncoder().encode('%PDF-1.7\n% synthetic resume for tests\n%%EOF\n');
 
@@ -91,5 +127,51 @@ describe('search defaults with AI (fake Messages API)', () => {
       jsonBody('POST', { resumeId: resume.id }),
     );
     expect(withPlace.body.locations).toEqual(['Austin, TX']);
+  });
+
+  it('runs a saved search against The Muse without a key', async () => {
+    const created = await t.json<SavedSearch>(
+      '/api/searches',
+      jsonBody('POST', {
+        name: 'SRE, Bay Area',
+        titles: ['SRE Lead', 'Incident Manager'],
+        skills: ['PagerDuty', 'Splunk'],
+        keywords: [],
+        excludeKeywords: [],
+        seniority: 'mid_senior',
+      }),
+    );
+    const { status, body } = await t.json<RunSearchResponse>(
+      `/api/searches/${created.body.id}/run`,
+      jsonBody('POST', { providers: ['muse'] }),
+    );
+    expect(status).toBe(200);
+    expect(body.providers).toEqual([{ provider: 'muse', total: 1, error: null }]);
+    expect(body.hits).toHaveLength(1);
+    expect(body.hits[0]).toMatchObject({
+      provider: 'muse',
+      sourceLabel: 'The Muse',
+      job: { title: 'Production Support Lead', location: 'San Francisco, CA; Charlotte, NC' },
+    });
+    expect(body.hits[0]?.fit.reasons).toEqual(
+      expect.arrayContaining(['Title matches “SRE Lead”', 'In San Francisco, CA; Charlotte, NC']),
+    );
+    const museCalls = seen.filter((s) => s.url.includes('themuse.com'));
+    // Two categories for the reliability family, one page each (both answers are short).
+    expect(museCalls.map((s) => new URL(s.url).searchParams.get('category'))).toEqual([
+      'Software Engineering',
+      'Computer and IT',
+    ]);
+    expect(new URL(museCalls[0]?.url ?? '').searchParams.getAll('location')).toContain(
+      'Oakland, CA',
+    );
+  });
+
+  it('includes The Muse in Discover', async () => {
+    const { body } = await t.json<DiscoverResponse>(
+      '/api/discover?q=Incident+Manager&provider=muse',
+    );
+    expect(body.providers).toEqual([{ provider: 'muse', total: 1, error: null }]);
+    expect(body.items.map((i) => i.sourceLabel)).toEqual(['The Muse']);
   });
 });

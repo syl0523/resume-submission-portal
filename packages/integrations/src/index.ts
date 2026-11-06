@@ -11,6 +11,7 @@ export * from './search/adzuna';
 export * from './search/dedupe';
 export * from './search/deeplinks';
 export * from './search/jsearch';
+export * from './search/muse';
 export * from './search/plan';
 export * from './search/types';
 export * from './search/usajobs';

@@ -116,6 +116,7 @@ const PROVIDER_LABEL: Record<SearchProvider, string> = {
   adzuna: 'Adzuna',
   usajobs: 'USAJOBS',
   boards: 'Company boards',
+  muse: 'The Muse',
 };
 
 function toRequest(f: FormState): SavedSearchRequest {
@@ -657,7 +658,7 @@ export function SearchDetail() {
                 'Run the search to collect matches.'
               ) : me && !me.features.jsearch && !me.features.adzuna && !me.features.usajobs ? (
                 <>
-                  No job search service is connected yet, so only your{' '}
+                  No keyed job search service is connected yet, so only The Muse and your{' '}
                   <Link to="/boards" className="text-accent hover:underline">
                     watched company boards
                   </Link>{' '}
