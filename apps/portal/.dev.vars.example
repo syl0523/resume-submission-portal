@@ -4,6 +4,8 @@ DEV_USER_EMAIL=me@example.com
 INBOUND_EMAIL_DOMAIN=jobs.example.com
 
 # Optional integrations
+# AI: Claude when ANTHROPIC_API_KEY is set; otherwise Workers AI, which only connects under
+# `pnpm dev:remote` (needs `wrangler login`). Plain `pnpm dev` without a key: AI features answer 502.
 # ANTHROPIC_API_KEY=
 # ADZUNA_APP_ID=
 # ADZUNA_APP_KEY=

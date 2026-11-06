@@ -47,7 +47,7 @@ flowchart LR
     Z[Adzuna US]
     U[USAJOBS]
     G[Greenhouse / Lever / Ashby / SmartRecruiters]
-    AI[Claude API]
+    AI[Claude API, or Workers AI without a key]
   end
   B --> A --> W
   X -- bearer token --> W

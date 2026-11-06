@@ -201,7 +201,7 @@ How a run works (`POST /api/searches/:id/run`):
    keeping the employer's own apply link and the richest description.
 4. `scoreJobFit(criteria, job)` on every posting; `needsSponsorship` turns sponsorship/citizenship/clearance
    flags into exclusions.
-5. `aiRerank: true` and AI configured → a fast Claude model re-scores the top 20 with a one-line reason.
+5. `aiRerank: true` and AI configured → a fast AI model (Claude Haiku, or Workers AI) re-scores the top 20 with a one-line reason.
 6. Upsert hits by `(searchId, urlKey)`: clear `isNew` on the search's previous hits, then mark postings never
    seen before as new (except on the search's first run). Link hits to existing applications by URL key.
    Update `lastRunAt`.
@@ -210,8 +210,8 @@ How a run works (`POST /api/searches/:id/run`):
 The daily cron runs every search with `alertsEnabled` (at most 2 queries per provider, to protect quotas).
 `DashboardStats.newMatches` counts new, undismissed, unsaved hits.
 
-`POST /api/searches/draft-from-resume` sends the resume to Claude (PDF as a document block; other files use
-the stored text) and asks for a track name, titles (current level, one step up and adjacent roles), skills,
+`POST /api/searches/draft-from-resume` sends the resume to the AI engine (Claude: PDF as a document block;
+Workers AI: PDF/DOCX converted to text; other files use the stored text) and asks for a track name, titles (current level, one step up and adjacent roles), skills,
 seniority, US locations, work mode and a one-line summary. The user reviews and saves it.
 
 ## Discover (keyword search)
@@ -233,12 +233,19 @@ query (`q`, `where`, `remote`, `provider=all|jsearch|adzuna|usajobs|boards`). It
 - **Answer**: drafts an answer to an application question from the profile (summary, experience, skills,
   saved answers) and the job (`applicationId` or `jobDescription`), within `maxWords`. Truthful to the
   profile; never invents experience.
-- Both return 501 `feature_disabled` without `ANTHROPIC_API_KEY`.
-- Models: `AI_MODEL_SMART` (default `claude-opus-5-5`) writes fit reports, cover letters, answers and the
-  profile / saved-search drafts; `AI_MODEL_FAST` (default `claude-haiku-5-5`) handles the email second
+- Engine, per call: Claude when `ANTHROPIC_API_KEY` is set; otherwise Cloudflare Workers AI through the
+  `AI` binding (KAN-67). Every AI route returns 501 `feature_disabled` only when neither is available.
+  `MeResponse.features.ai` is true with either engine.
+- Claude models: `AI_MODEL_SMART` (default `claude-opus-5-5`) writes fit reports, cover letters, answers and
+  the profile / saved-search drafts; `AI_MODEL_FAST` (default `claude-haiku-5-5`) handles the email second
   opinion and Job Match re-ranking. Structured answers use JSON-schema outputs; resumes go in as a PDF
   document block (other files: their stored text), marked for prompt caching. Opus/Sonnet requests opt into
   server-side refusal fallback (`fallbacks: "default"`).
+- Workers AI: `AI_MODEL_WORKERS` (default `@cf/google/gemma-4-26b-a4b-it`) serves every feature. Resumes
+  are converted to text with `env.AI.toMarkdown` (PDF, DOCX; otherwise the stored text), capped at 40,000
+  characters. Structured answers use JSON mode plus the schema in the prompt, are validated with Zod and
+  retried once when invalid. The `model` field of AI responses then holds the `@cf/...` model id. Scanned
+  (image-only) PDFs have no text: paste the text on the Resumes page.
 - A declined request is 422 `unprocessable`; an AI service failure (after the SDK's retries) is 502
   `upstream_error`.
 

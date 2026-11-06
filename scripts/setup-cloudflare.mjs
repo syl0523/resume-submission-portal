@@ -21,7 +21,7 @@ const DB_NAME = 'resume-submission-portal';
 const BUCKET = 'resume-submission-portal-files';
 const PLACEHOLDER_ID = '00000000-0000-0000-0000-000000000000';
 const SECRETS = [
-  ['ANTHROPIC_API_KEY', 'Claude: resume drafts, fit reports, answers, email second opinion'],
+  ['ANTHROPIC_API_KEY', 'Claude for the AI features (without it, Workers AI is used)'],
   ['JSEARCH_API_KEY', 'JSearch (RapidAPI): LinkedIn, Indeed and company-site listings'],
   ['ADZUNA_APP_ID', 'Adzuna search (US index)'],
   ['ADZUNA_APP_KEY', 'Adzuna search (US index)'],

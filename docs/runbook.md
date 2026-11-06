@@ -12,7 +12,9 @@ pnpm check          # lint + typecheck + tests (run before every push)
 ```
 
 Local mode signs you in as `DEV_USER_EMAIL` (localhost only). Optional keys go in `apps/portal/.dev.vars`
-(see `.dev.vars.example`).
+(see `.dev.vars.example`). `pnpm dev` needs no Cloudflare account; AI features then need `ANTHROPIC_API_KEY`
+in `.dev.vars`. `pnpm dev:remote` also connects the Workers AI binding (run `wrangler login` first), so AI
+works without a key, using your account's Workers AI allowance.
 
 ## Production on Cloudflare
 
@@ -34,7 +36,7 @@ Cloudflare dashboard; the manual equivalents of steps 2 to 5 are kept for refere
 4. **Secrets** (only the ones you use):
 
    ```bash
-   pnpm exec wrangler secret put ANTHROPIC_API_KEY   # AI: drafts, fit reports, answers, email second opinion
+   pnpm exec wrangler secret put ANTHROPIC_API_KEY   # AI with Claude (without it, Workers AI is used)
    pnpm exec wrangler secret put JSEARCH_API_KEY     # LinkedIn / Indeed / company sites via Google for Jobs
    pnpm exec wrangler secret put ADZUNA_APP_ID
    pnpm exec wrangler secret put ADZUNA_APP_KEY
@@ -106,11 +108,23 @@ it, and never autofills LinkedIn or Indeed.
 | JSearch   | rapidapi.com → JSearch → Subscribe (free tier) | Covers LinkedIn, Indeed, Glassdoor, ZipRecruiter and company sites via Google for Jobs |
 | Adzuna    | developer.adzuna.com                           | `app_id` + `app_key`; US index by default (`ADZUNA_COUNTRY=us`)                        |
 | USAJOBS   | developer.usajobs.gov → API request            | Key is emailed; `USAJOBS_USER_AGENT` must be that email                                |
-| Anthropic | console.anthropic.com                          | Enables resume drafts, fit reports, answers and email second opinion                   |
+| Anthropic | console.anthropic.com                          | Claude for resume drafts, fit reports, answers and email second opinion (optional)     |
 
-AI uses two models, set as vars in `wrangler.jsonc`: `AI_MODEL_SMART` (default `claude-opus-5-5`) writes fit
-reports, answers and resume drafts; `AI_MODEL_FAST` (default `claude-haiku-5-5`) gives the email second
-opinion and re-ranks search results. Point `AI_MODEL_SMART` at a cheaper model to cut cost.
+AI works without any key: when `ANTHROPIC_API_KEY` is not set, the Workers AI binding (`AI` in
+`wrangler.jsonc`) runs every AI feature on your Cloudflare account with `AI_MODEL_WORKERS` (default
+`@cf/google/gemma-4-26b-a4b-it`). The free allowance is 10,000 Neurons a day; usage beyond it is billed on
+Workers Paid. Answers are good but weaker than Claude's, and scanned (image-only) PDFs need their text
+pasted on the Resumes page.
+
+With the key set, Claude is used instead, with two models set as vars in `wrangler.jsonc`: `AI_MODEL_SMART`
+(default `claude-opus-5-5`) writes fit reports, answers and resume drafts; `AI_MODEL_FAST` (default
+`claude-haiku-5-5`) gives the email second opinion and re-ranks search results. Point `AI_MODEL_SMART` at a
+cheaper model to cut cost.
+
+To add a key in the Cloudflare dashboard instead of the command line: Workers & Pages →
+resume-submission-portal → Settings → Variables and Secrets → Add → type **Secret**, name (for example
+`ANTHROPIC_API_KEY`), value → Deploy. Plain settings such as `USAJOBS_USER_AGENT` belong in `wrangler.jsonc`
+(`vars`), because each deploy from GitHub replaces dashboard-edited plain variables.
 
 ## Calendar
 

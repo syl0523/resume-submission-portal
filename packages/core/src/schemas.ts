@@ -290,7 +290,7 @@ export const draftFromResumeSchema = z.object({
 /** Run a saved search now. Omitted fields: every configured provider, no AI re-rank. */
 export const runSearchSchema = z.object({
   providers: z.array(z.enum(SEARCH_PROVIDERS)).min(1).optional(),
-  /** Ask a fast Claude model to re-score the top results with a one-line reason (costs tokens). */
+  /** Ask a fast AI model to re-score the top results with a one-line reason (costs tokens). */
   aiRerank: z.boolean().default(false),
   /** Upper bound on title x location queries per provider (protects API quotas). */
   maxQueries: z.number().int().min(1).max(8).default(4),
