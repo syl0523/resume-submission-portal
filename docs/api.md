@@ -158,6 +158,7 @@ Row-level problems go to `errors`.
 | `GET /api/boards`                       | –                                                             | `WatchedBoard[]`                                                                                  |
 | `POST /api/boards`                      | `BoardCreateRequest`                                          | 201 `WatchedBoard` (fetches once to validate and baseline; 409 `duplicate`; 502 `upstream_error`) |
 | `DELETE /api/boards/:id`                | –                                                             | 204                                                                                               |
+| `POST /api/boards/sync`                 | –                                                             | `BoardSyncAllResponse`: every watched board synced now (at most 40, 4 at a time; KAN-69)          |
 | `POST /api/boards/:id/sync`             | –                                                             | `WatchedBoard`                                                                                    |
 | `GET /api/boards/postings`              | `boardId`, `onlyNew` (`true`/`false`), `q`, `limit`, `offset` | `ListResponse<BoardPosting>` (open, not dismissed)                                                |
 | `POST /api/boards/postings/:id/save`    | `{ status?: 'saved' \| 'applied' }`                           | 201 `ApplicationDetail` (200 with the existing application when the job was already saved)        |

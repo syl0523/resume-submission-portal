@@ -248,6 +248,14 @@ export interface WatchedBoard {
   createdAt: string;
 }
 
+/** `POST /api/boards/sync`: every watched board synced now (KAN-69). */
+export interface BoardSyncAllResponse {
+  synced: number;
+  failed: number;
+  /** All watched boards after the sync, as `GET /api/boards` returns them. */
+  boards: WatchedBoard[];
+}
+
 export interface BoardPosting {
   id: string;
   boardId: string;

@@ -1,4 +1,10 @@
-import { type BoardPosting, boardCreateSchema, jobInputSchema, type ListResponse } from '@jsp/core';
+import {
+  type BoardPosting,
+  type BoardSyncAllResponse,
+  boardCreateSchema,
+  jobInputSchema,
+  type ListResponse,
+} from '@jsp/core';
 import {
   fetchBoardJobs,
   fetchJobFromUrl,
@@ -22,6 +28,7 @@ import {
   listBoards,
   NEW_WINDOW_DAYS,
   postingStatements,
+  syncAllBoards,
   syncBoard,
   toBoardPosting,
   toWatchedBoard,
@@ -219,6 +226,15 @@ boardRoutes.post('/postings/:id/dismiss', async (c) => {
     .set({ dismissed: true })
     .where(eq(boardPostings.id, posting.id));
   return c.body(null, 204);
+});
+
+// Sync every watched board now (KAN-69). Registered before the `/:id` routes.
+boardRoutes.post('/sync', async (c) => {
+  const db = c.var.db;
+  const userId = c.var.user.id;
+  const { synced, failed } = await syncAllBoards(db, c.env, userId);
+  const body: BoardSyncAllResponse = { synced, failed, boards: await listBoards(db, userId) };
+  return c.json(body);
 });
 
 boardRoutes.post('/:id/sync', async (c) => {

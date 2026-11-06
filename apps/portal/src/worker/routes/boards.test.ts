@@ -2,6 +2,7 @@ import type {
   ApiErrorBody,
   ApplicationDetail,
   BoardPosting,
+  BoardSyncAllResponse,
   ListResponse,
   MeResponse,
   WatchedBoard,
@@ -315,6 +316,23 @@ describe('daily board sync order and baseline (KAN-68)', () => {
     expect(await syncDueBoards(db, t.env, new Date(), 2)).toEqual({
       boardsSynced: 0,
       boardErrors: 1,
+    });
+  });
+
+  it('"Sync all" syncs every watched board now, fresh or not (KAN-69)', async () => {
+    requested.length = 0;
+    const { status, body } = await t.json<BoardSyncAllResponse>('/api/boards/sync', {
+      method: 'POST',
+    });
+    expect(status).toBe(200);
+    // contoso, alpha, beta, gamma and fresh succeed; broken (Lever 500) fails again.
+    expect(body).toMatchObject({ synced: 5, failed: 1 });
+    expect(body.boards).toHaveLength(6);
+    expect(['contoso', 'fresh', 'broken'].map(synced)).toEqual([true, true, true]);
+    expect(body.boards.find((b) => b.token === 'broken')?.lastError).toMatch(/HTTP 500/);
+    expect(body.boards.find((b) => b.token === 'contoso')).toMatchObject({
+      openPostings: 1,
+      lastError: null,
     });
   });
 });

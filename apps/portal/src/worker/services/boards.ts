@@ -1,6 +1,6 @@
 import type { BoardPosting, WatchedBoard } from '@jsp/core';
 import { type BoardJob, fetchBoardJobs, UpstreamError } from '@jsp/integrations';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { chunk, type Db, runBatch } from '../db/client';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../db/schema';
 import { type Env, outboundFetch } from '../env';
 import { newId } from '../lib/crypto';
+import { describeError } from '../lib/errors';
 import { addDays, nowIso } from '../lib/time';
 
 /**
@@ -20,6 +21,13 @@ import { addDays, nowIso } from '../lib/time';
 
 export const NEW_WINDOW_DAYS = 7;
 const SYNC_TIMEOUT_MS = 20_000;
+/** Boards fetched at the same time by a multi-board sync. */
+const SYNC_CONCURRENCY = 4;
+/**
+ * Most boards one "Sync all" request syncs (KAN-69): stays inside the Workers Free plan's 50 outbound
+ * requests per invocation.
+ */
+export const SYNC_ALL_MAX = 40;
 
 export function isNewPosting(
   posting: Pick<BoardPostingRow, 'firstSeenAt' | 'savedApplicationId'>,
@@ -193,4 +201,54 @@ export async function getBoardRow(
     .from(watchedBoards)
     .where(and(eq(watchedBoards.id, id), eq(watchedBoards.userId, userId)))
     .get();
+}
+
+/** Sync order for several boards: healthy before failing (so broken boards cannot starve the rest), oldest sync first. */
+export function boardSyncOrder(): SQL[] {
+  return [
+    sql`${watchedBoards.lastError} is not null`,
+    sql`coalesce(${watchedBoards.lastSyncedAt}, '')`,
+    asc(watchedBoards.createdAt),
+  ];
+}
+
+/** Sync several boards, a few at a time. Failures are stored on each board (`lastError`) and counted. */
+export async function syncBoards(
+  db: Db,
+  env: Env,
+  boards: WatchedBoardRow[],
+  now = nowIso(),
+): Promise<{ synced: number; failed: number }> {
+  const result = { synced: 0, failed: 0 };
+  let next = 0;
+  const worker = async () => {
+    for (let board = boards[next++]; board; board = boards[next++]) {
+      try {
+        await syncBoard(db, env, board, now);
+        result.synced += 1;
+      } catch (err) {
+        result.failed += 1;
+        console.warn(`Board ${board.provider}/${board.token} failed to sync`, describeError(err));
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(SYNC_CONCURRENCY, boards.length) }, worker));
+  return result;
+}
+
+/** "Sync all" (KAN-69): every board the user watches, up to SYNC_ALL_MAX, in sync order. */
+export async function syncAllBoards(
+  db: Db,
+  env: Env,
+  userId: string,
+  now = nowIso(),
+): Promise<{ synced: number; failed: number }> {
+  const boards = await db
+    .select()
+    .from(watchedBoards)
+    .where(eq(watchedBoards.userId, userId))
+    .orderBy(...boardSyncOrder())
+    .limit(SYNC_ALL_MAX)
+    .all();
+  return syncBoards(db, env, boards, now);
 }

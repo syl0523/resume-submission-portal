@@ -1,5 +1,5 @@
 import { ACTIVE_STATUSES } from '@jsp/core';
-import { and, asc, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, inArray, isNull, lt, or } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { createDb, type Db } from '../db/client';
 import { applications, watchedBoards } from '../db/schema';
@@ -7,7 +7,7 @@ import { type Env, numberVar } from '../env';
 import { describeError } from '../lib/errors';
 import { addDays } from '../lib/time';
 import { buildTransitionStatements } from './applications';
-import { syncBoard } from './boards';
+import { boardSyncOrder, syncBoards } from './boards';
 
 /**
  * The daily cron (KAN-25, KAN-68; 11:00 UTC): sync the watched boards that are due, mark silent
@@ -43,24 +43,11 @@ export async function syncDueBoards(
     .select()
     .from(watchedBoards)
     .where(or(isNull(watchedBoards.lastSyncedAt), lt(watchedBoards.lastSyncedAt, cutoff)))
-    .orderBy(
-      sql`${watchedBoards.lastError} is not null`,
-      sql`coalesce(${watchedBoards.lastSyncedAt}, '')`,
-      asc(watchedBoards.createdAt),
-    )
+    .orderBy(...boardSyncOrder())
     .limit(limit)
     .all();
-  const report: BoardSyncReport = { boardsSynced: 0, boardErrors: 0 };
-  for (const board of due) {
-    try {
-      await syncBoard(db, env, board, now.toISOString());
-      report.boardsSynced += 1;
-    } catch (err) {
-      report.boardErrors += 1;
-      console.warn(`Board ${board.provider}/${board.token} failed to sync`, describeError(err));
-    }
-  }
-  return report;
+  const { synced, failed } = await syncBoards(db, env, due, now.toISOString());
+  return { boardsSynced: synced, boardErrors: failed };
 }
 
 export interface DailyReport {

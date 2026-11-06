@@ -1,4 +1,9 @@
-import type { ApplicationDetail, BoardPosting, WatchedBoard } from '@jsp/core';
+import type {
+  ApplicationDetail,
+  BoardPosting,
+  BoardSyncAllResponse,
+  WatchedBoard,
+} from '@jsp/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import { Building2, ExternalLink, Plus, RefreshCw, Trash2, X } from 'lucide-react';
@@ -34,6 +39,33 @@ function useRefreshBoards() {
     void qc.invalidateQueries({ queryKey: keys.boards });
     void qc.invalidateQueries({ queryKey: keys.postingsAll });
   };
+}
+
+/** Sync every watched board at once (KAN-69). */
+function SyncAll() {
+  const refresh = useRefreshBoards();
+  const sync = useMutation({
+    mutationFn: () => post<BoardSyncAllResponse>('/api/boards/sync'),
+    onSuccess: refresh,
+  });
+  const done = sync.data;
+  return (
+    <div className="flex items-center gap-2">
+      {done ? (
+        <span className="text-xs text-muted" role="status">
+          {done.synced} synced{done.failed ? `, ${done.failed} failed` : ''}
+        </span>
+      ) : null}
+      {sync.error ? (
+        <span className="text-xs text-[var(--tone-danger-ink)]" role="status">
+          Sync failed
+        </span>
+      ) : null}
+      <Button size="sm" onClick={() => sync.mutate()} busy={sync.isPending}>
+        <RefreshCw className="size-4" aria-hidden /> Sync all
+      </Button>
+    </div>
+  );
 }
 
 function AddBoard() {
@@ -229,7 +261,7 @@ export function Boards() {
         ) : null}
         {boards && boards.length > 0 ? (
           <div className="grid gap-5 lg:grid-cols-[20rem_1fr]">
-            <Card title="Watching">
+            <Card title="Watching" action={<SyncAll />}>
               <ul className="-mx-4 divide-y divide-line sm:-mx-5">
                 {boards.map((b) => (
                   <BoardRow
