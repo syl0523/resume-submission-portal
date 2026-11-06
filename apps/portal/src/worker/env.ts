@@ -29,9 +29,14 @@ export interface Env {
   JSEARCH_API_KEY?: string;
   JSEARCH_HOST?: string;
 
+  /** Claude: the preferred AI engine when set. */
   ANTHROPIC_API_KEY?: string;
   AI_MODEL_FAST?: string;
   AI_MODEL_SMART?: string;
+  /** Cloudflare Workers AI: the AI engine when ANTHROPIC_API_KEY is not set (KAN-67). */
+  AI?: Ai;
+  /** Workers AI text model for every AI feature, default @cf/google/gemma-4-26b-a4b-it. */
+  AI_MODEL_WORKERS?: string;
 
   /** Outbound fetch for job-board, search and AI APIs. Tests inject a fake; production omits it. */
   OUTBOUND_FETCH?: typeof fetch;

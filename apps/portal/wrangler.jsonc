@@ -26,6 +26,11 @@
   // Create with: wrangler r2 bucket create resume-submission-portal-files
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "resume-submission-portal-files" }],
 
+  // Workers AI: runs the AI features when ANTHROPIC_API_KEY is not set (Claude is preferred when it
+  // is). Always runs on your Cloudflare account, also in local dev (so `pnpm dev` needs
+  // `wrangler login`); usage beyond the 10,000 free Neurons a day is billed.
+  "ai": { "binding": "AI", "remote": true },
+
   // Daily at 11:00 UTC (6-7am Toronto): board sync, follow-up reminders, no-response marking.
   "triggers": { "crons": ["0 11 * * *"] },
 
@@ -44,7 +49,9 @@
     "USAJOBS_USER_AGENT": "",
     "JSEARCH_HOST": "jsearch.p.rapidapi.com",
     "AI_MODEL_FAST": "claude-haiku-5-5",
-    "AI_MODEL_SMART": "claude-opus-5-5"
+    "AI_MODEL_SMART": "claude-opus-5-5",
+    // Workers AI model used without ANTHROPIC_API_KEY (must support JSON-schema output).
+    "AI_MODEL_WORKERS": "@cf/google/gemma-4-26b-a4b-it"
     // Secrets (wrangler secret put ...): ANTHROPIC_API_KEY, ADZUNA_APP_ID,
     // ADZUNA_APP_KEY, USAJOBS_API_KEY, JSEARCH_API_KEY
   }
