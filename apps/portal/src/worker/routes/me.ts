@@ -1,6 +1,7 @@
 import type { MeResponse } from '@jsp/core';
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
+import { aiEnabled } from '../services/ai';
 import { inboundAddressFor } from '../services/users';
 
 export const meRoutes = new Hono<AppEnv>().get('/', (c) => {
@@ -12,7 +13,7 @@ export const meRoutes = new Hono<AppEnv>().get('/', (c) => {
     inboundAddress,
     calendarUrl: `${origin}/api/calendar/${user.calendarToken}.ics`,
     features: {
-      ai: Boolean(c.env.ANTHROPIC_API_KEY),
+      ai: aiEnabled(c.env),
       adzuna: Boolean(c.env.ADZUNA_APP_ID && c.env.ADZUNA_APP_KEY),
       usajobs: Boolean(c.env.USAJOBS_API_KEY && c.env.USAJOBS_USER_AGENT),
       jsearch: Boolean(c.env.JSEARCH_API_KEY),

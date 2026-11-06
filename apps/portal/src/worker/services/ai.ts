@@ -25,31 +25,51 @@ import { HttpError, notFound } from '../lib/errors';
 import { nowIso } from '../lib/time';
 
 /**
- * Claude-powered helpers (KAN-32, KAN-33, KAN-39, KAN-44, KAN-45): email second opinion, fit report
+ * AI helpers (KAN-32, KAN-33, KAN-39, KAN-44, KAN-45, KAN-67): email second opinion, fit report
  * and cover letter, answers to application questions, profile and saved-search drafts from a
- * resume, Job Match re-ranking. All optional: without ANTHROPIC_API_KEY the routes answer 501.
+ * resume, Job Match re-ranking. All optional.
  *
- * Models: AI_MODEL_SMART (default claude-opus-5-5) for writing and resume reading;
+ * Engine, per call: Claude when ANTHROPIC_API_KEY is set; otherwise Cloudflare Workers AI through
+ * the `AI` binding (KAN-67); otherwise the routes answer 501. Both engines get the same prompts.
+ *
+ * Claude models: AI_MODEL_SMART (default claude-opus-5-5) for writing and resume reading;
  * AI_MODEL_FAST (default claude-haiku-5-5) for the quick, high-volume classification and re-rank.
+ * Workers AI: AI_MODEL_WORKERS (default @cf/google/gemma-4-26b-a4b-it) for everything.
  */
 
 export const DEFAULT_SMART_MODEL = 'claude-opus-5-5';
 export const DEFAULT_FAST_MODEL = 'claude-haiku-5-5';
+/** On the Workers Free plan, 256k-token context, JSON-schema output (chat-completions format). */
+export const DEFAULT_WORKERS_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 
 type Effort = 'low' | 'medium' | 'high';
+type Tier = 'smart' | 'fast';
+export type AiEngine = 'anthropic' | 'workers-ai';
+
+/** Which engine serves AI calls: Claude when its key is set, else Workers AI when bound, else none. */
+export function aiEngine(env: Env): AiEngine | null {
+  if (env.ANTHROPIC_API_KEY?.trim()) return 'anthropic';
+  if (env.AI) return 'workers-ai';
+  return null;
+}
 
 export function aiEnabled(env: Env): boolean {
-  return Boolean(env.ANTHROPIC_API_KEY?.trim());
+  return aiEngine(env) !== null;
 }
 
 export function requireAi(env: Env): void {
   if (!aiEnabled(env)) {
-    throw new HttpError(501, 'feature_disabled', 'AI is not configured (set ANTHROPIC_API_KEY)');
+    throw new HttpError(
+      501,
+      'feature_disabled',
+      'AI is not configured (set ANTHROPIC_API_KEY or add the Workers AI binding)',
+    );
   }
 }
 
 const smartModel = (env: Env) => env.AI_MODEL_SMART?.trim() || DEFAULT_SMART_MODEL;
 const fastModel = (env: Env) => env.AI_MODEL_FAST?.trim() || DEFAULT_FAST_MODEL;
+const workersModel = (env: Env) => env.AI_MODEL_WORKERS?.trim() || DEFAULT_WORKERS_MODEL;
 
 function client(env: Env): Anthropic {
   return new Anthropic({
@@ -107,7 +127,43 @@ function fallbackParams(model: string) {
     : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const };
 }
 
+/** A prompt part: plain text, or the resume (a document for Claude, extracted text for Workers AI). */
+type PromptPart = { type: 'text'; text: string } | { type: 'resume'; resume: ResumeRow };
+
+/** One AI call, independent of the engine. */
 interface CallOptions {
+  tier: Tier;
+  effort: Effort;
+  system: string;
+  content: PromptPart[];
+  maxTokens: number;
+}
+
+/** One request with a JSON-schema output, validated against the Zod schema. */
+async function structured<S extends z.ZodType>(
+  env: Env,
+  schema: S,
+  opts: CallOptions,
+): Promise<{ data: z.infer<S>; model: string }> {
+  const engine = aiEngine(env);
+  if (engine === 'workers-ai') return workersStructured(env, schema, opts);
+  requireAi(env);
+  return claudeStructured(env, schema, await claudeCall(env, opts));
+}
+
+/** One request answered in plain text. */
+async function plainText(env: Env, opts: CallOptions): Promise<{ text: string; model: string }> {
+  const engine = aiEngine(env);
+  if (engine === 'workers-ai') return workersPlainText(env, opts);
+  requireAi(env);
+  return claudePlainText(env, await claudeCall(env, opts));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Claude (Anthropic API)
+// ---------------------------------------------------------------------------------------------
+
+interface ClaudeCallOptions {
   model: string;
   effort: Effort;
   system: string;
@@ -115,11 +171,28 @@ interface CallOptions {
   maxTokens: number;
 }
 
-/** One request with a JSON-schema output, validated by the SDK against the Zod schema. */
-async function structured<S extends z.ZodType>(
+async function claudeCall(env: Env, opts: CallOptions): Promise<ClaudeCallOptions> {
+  const content: BetaContentBlockParam[] = [];
+  for (const part of opts.content) {
+    content.push(
+      part.type === 'resume'
+        ? await resumeBlock(env, part.resume)
+        : { type: 'text', text: part.text },
+    );
+  }
+  return {
+    model: opts.tier === 'smart' ? smartModel(env) : fastModel(env),
+    effort: opts.effort,
+    system: opts.system,
+    content,
+    maxTokens: opts.maxTokens,
+  };
+}
+
+async function claudeStructured<S extends z.ZodType>(
   env: Env,
   schema: S,
-  opts: CallOptions,
+  opts: ClaudeCallOptions,
 ): Promise<{ data: z.infer<S>; model: string }> {
   let response: Awaited<ReturnType<Anthropic['beta']['messages']['parse']>>;
   try {
@@ -147,8 +220,10 @@ async function structured<S extends z.ZodType>(
   return { data: parsed.data, model: response.model };
 }
 
-/** One request answered in plain text. */
-async function plainText(env: Env, opts: CallOptions): Promise<{ text: string; model: string }> {
+async function claudePlainText(
+  env: Env,
+  opts: ClaudeCallOptions,
+): Promise<{ text: string; model: string }> {
   let response: Awaited<ReturnType<Anthropic['beta']['messages']['create']>>;
   try {
     response = await client(env).beta.messages.create({
@@ -206,19 +281,351 @@ export async function resumeBlock(env: Env, resume: ResumeRow): Promise<BetaCont
   if (!text && resume.mimeType === 'text/plain') {
     text = (await (await env.FILES.get(resume.fileKey))?.text())?.trim() ?? '';
   }
-  if (!text) {
-    throw new HttpError(
-      422,
-      'unprocessable',
-      'This resume has no readable text. Upload it as a PDF, or paste its plain text on the Resumes page.',
-    );
-  }
+  if (!text) throw noResumeText();
   return {
     type: 'document',
     source: { type: 'text', media_type: 'text/plain', data: text },
     title: resume.fileName,
     cache_control: { type: 'ephemeral' },
   };
+}
+
+const noResumeText = () =>
+  new HttpError(
+    422,
+    'unprocessable',
+    'This resume has no readable text. Upload it as a PDF, or paste its plain text on the Resumes page.',
+  );
+
+// ---------------------------------------------------------------------------------------------
+// Cloudflare Workers AI (KAN-67): the engine when no Anthropic key is set
+// ---------------------------------------------------------------------------------------------
+
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+/** Files Workers AI Markdown Conversion reads (env.AI.toMarkdown). */
+const CONVERTIBLE = new Set(['application/pdf', DOCX]);
+/** ~10k tokens: any real resume fits, and so does a long posting next to it. */
+export const WORKERS_RESUME_CHARS = 40_000;
+
+/**
+ * The resume as plain text for Workers AI: PDF and DOCX through Markdown Conversion, falling back
+ * to the stored text (and a .txt file's contents). Truncated to WORKERS_RESUME_CHARS.
+ */
+export async function resumeText(env: Env, resume: ResumeRow): Promise<string> {
+  let text = '';
+  if (env.AI && CONVERTIBLE.has(resume.mimeType)) {
+    const object = await env.FILES.get(resume.fileKey);
+    if (object) {
+      try {
+        const result = await env.AI.toMarkdown(
+          {
+            name: resume.fileName,
+            blob: new Blob([await object.arrayBuffer()], { type: resume.mimeType }),
+          },
+          { conversionOptions: { pdf: { metadata: false } } },
+        );
+        if (result.format === 'error') console.warn('Resume conversion failed', result.error);
+        else text = result.data.trim();
+      } catch (err) {
+        console.warn('Resume conversion failed', err instanceof Error ? err.message : err);
+      }
+    }
+  }
+  if (!text) text = resume.textContent?.trim() ?? '';
+  if (!text && resume.mimeType === 'text/plain') {
+    text = (await (await env.FILES.get(resume.fileKey))?.text())?.trim() ?? '';
+  }
+  if (!text) throw noResumeText();
+  return truncate(text, WORKERS_RESUME_CHARS);
+}
+
+/** The user message for Workers AI: text parts as written, the resume as text in <resume> tags. */
+async function workersUserMessage(env: Env, parts: PromptPart[]): Promise<string> {
+  const chunks: string[] = [];
+  for (const part of parts) {
+    chunks.push(
+      part.type === 'text'
+        ? part.text
+        : `<resume file="${part.resume.fileName}">\n${await resumeText(env, part.resume)}\n</resume>`,
+    );
+  }
+  return chunks.join('\n\n');
+}
+
+/**
+ * Models in the Workers AI JSON Mode docs that take the schema itself as `json_schema` and answer
+ * `{ response }`. Every other model (Gemma 4, GLM, Kimi, Llama 4, ...) uses the chat-completions
+ * format: `json_schema: { name, schema, strict }` in, `choices[0].message.content` out.
+ */
+const LEGACY_JSON_MODE_MODELS = new Set([
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/meta/llama-3-8b-instruct',
+  '@cf/meta/llama-3.1-8b-instruct',
+  '@hf/nousresearch/hermes-2-pro-mistral-7b',
+  '@hf/thebloke/deepseek-coder-6.7b-instruct-awq',
+  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+]);
+
+interface WorkersRequest {
+  system: string;
+  user: string;
+  maxTokens: number;
+  /** Let a reasoning model think first (chat-completions models only). */
+  thinking: boolean;
+  schema?: Record<string, unknown>;
+}
+
+/** The env.AI.run input for this model's format. */
+export function workersInput(model: string, req: WorkersRequest): Record<string, unknown> {
+  const messages = [
+    { role: 'system', content: req.system },
+    { role: 'user', content: req.user },
+  ];
+  if (LEGACY_JSON_MODE_MODELS.has(model)) {
+    return {
+      messages,
+      max_tokens: req.maxTokens,
+      ...(req.schema ? { response_format: { type: 'json_schema', json_schema: req.schema } } : {}),
+    };
+  }
+  return {
+    messages,
+    max_completion_tokens: req.maxTokens,
+    chat_template_kwargs: { enable_thinking: req.thinking },
+    ...(req.schema
+      ? {
+          response_format: {
+            type: 'json_schema',
+            json_schema: { name: 'answer', schema: req.schema, strict: true },
+          },
+        }
+      : {}),
+  };
+}
+
+/** The JSON Schema sent with a request: Zod 4's output, without the `$schema` keyword. */
+export function jsonSchemaFor(schema: z.ZodType): Record<string, unknown> {
+  const { $schema: _ignored, ...rest } = z.toJSONSchema(schema) as Record<string, unknown>;
+  return rest;
+}
+
+const chatOutputSchema = z.object({
+  choices: z
+    .array(
+      z.object({
+        message: z.object({
+          content: z
+            .union([z.string(), z.array(z.object({ text: z.string().nullish() }))])
+            .nullish(),
+          refusal: z.string().nullish(),
+        }),
+        finish_reason: z.string().nullish(),
+      }),
+    )
+    .min(1),
+});
+const legacyOutputSchema = z.object({ response: z.unknown() });
+
+interface WorkersAnswer {
+  text: string;
+  /** Already-parsed JSON (legacy JSON Mode models can answer with an object). */
+  json?: unknown;
+  refusal: string | null;
+  cutOff: boolean;
+}
+
+/** Read either output format: chat-completions `choices` or the legacy `{ response }`. */
+export function readWorkersOutput(output: unknown): WorkersAnswer {
+  const chat = chatOutputSchema.safeParse(output);
+  if (chat.success) {
+    const choice = chat.data.choices[0];
+    const content = choice?.message.content;
+    const text =
+      typeof content === 'string'
+        ? content
+        : (content ?? []).map((part) => part.text ?? '').join('');
+    return {
+      text,
+      refusal: choice?.message.refusal?.trim() || null,
+      cutOff: choice?.finish_reason === 'length',
+    };
+  }
+  const legacy = legacyOutputSchema.safeParse(output);
+  const response = legacy.success ? legacy.data.response : undefined;
+  if (typeof response === 'string') return { text: response, refusal: null, cutOff: false };
+  if (response !== null && typeof response === 'object') {
+    return { text: '', json: response, refusal: null, cutOff: false };
+  }
+  return { text: '', refusal: null, cutOff: false };
+}
+
+/** Drop reasoning a model wrote into its answer. */
+const stripThinking = (text: string) => text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+/** The JSON object in a model's answer, tolerating code fences and text around it. */
+export function parseJsonAnswer(text: string): unknown {
+  let body = stripThinking(text);
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(body);
+  if (fenced?.[1]) body = fenced[1].trim();
+  const candidates = [body];
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  if (start >= 0 && end > start) candidates.push(body.slice(start, end + 1));
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // try the next candidate
+    }
+  }
+  return undefined;
+}
+
+/** "JSON Mode couldn't be met": the model could not produce the schema. Worth one retry. */
+const isJsonModeError = (err: unknown) => err instanceof Error && /json mode/i.test(err.message);
+
+/** Workers AI errors (thrown by env.AI.run, e.g. "InferenceUpstreamError: 3040: ...") → 502. */
+function workersError(err: unknown, model: string): Error {
+  if (err instanceof HttpError) return err;
+  const message = err instanceof Error ? err.message : String(err);
+  console.warn('Workers AI request failed', { model, message });
+  if (/\b3036\b|daily free allocation/i.test(message)) {
+    return new HttpError(
+      502,
+      'upstream_error',
+      "Today's free Workers AI allowance is used up (it resets at 00:00 UTC). Try again tomorrow, or move to the Workers Paid plan.",
+    );
+  }
+  if (/\b5035\b|workers paid/i.test(message)) {
+    return new HttpError(
+      502,
+      'upstream_error',
+      `The Workers AI model ${model} needs the Workers Paid plan. Set AI_MODEL_WORKERS to a model your plan includes.`,
+    );
+  }
+  if (/\b3040\b|\b429\b|capacity|rate limit/i.test(message)) {
+    return new HttpError(
+      502,
+      'upstream_error',
+      'The AI service is busy right now. Try again in a minute.',
+    );
+  }
+  if (/\b5007\b|\b3042\b|no such model|invalid model/i.test(message)) {
+    return new HttpError(
+      502,
+      'upstream_error',
+      `Workers AI has no model ${model} (check AI_MODEL_WORKERS).`,
+    );
+  }
+  if (/run remotely/i.test(message)) {
+    return new HttpError(
+      502,
+      'upstream_error',
+      'Workers AI runs only on Cloudflare. In local dev, sign in with `wrangler login` (or set ANTHROPIC_API_KEY).',
+    );
+  }
+  if (/context window|too many tokens|\b3006\b/i.test(message)) {
+    return new HttpError(
+      502,
+      'upstream_error',
+      'The resume and job posting are too long for the AI model. Shorten the job description and try again.',
+    );
+  }
+  return new HttpError(502, 'upstream_error', 'The AI service failed. Try again.');
+}
+
+async function runWorkersAi(env: Env, model: string, input: Record<string, unknown>) {
+  if (!env.AI) throw new HttpError(501, 'feature_disabled', 'Workers AI is not bound');
+  return env.AI.run(model, input);
+}
+
+const workersSystem = (system: string, schema: Record<string, unknown>) =>
+  `${system}\n\nReply with only one JSON object that matches this JSON Schema:\n${JSON.stringify(schema)}`;
+
+/**
+ * Structured output on Workers AI: JSON-schema response format (plus the schema in the prompt),
+ * validated with Zod. One retry, without reasoning, when the answer is not valid; then 502.
+ * Reasoning is on only for high-effort calls (the fit report).
+ */
+async function workersStructured<S extends z.ZodType>(
+  env: Env,
+  schema: S,
+  opts: CallOptions,
+): Promise<{ data: z.infer<S>; model: string }> {
+  const model = workersModel(env);
+  const jsonSchema = jsonSchemaFor(schema);
+  const system = workersSystem(opts.system, jsonSchema);
+  const user = await workersUserMessage(env, opts.content);
+  let cutOff = false;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let output: unknown;
+    try {
+      output = await runWorkersAi(
+        env,
+        model,
+        workersInput(model, {
+          system,
+          user,
+          maxTokens: opts.maxTokens,
+          thinking: attempt === 1 && opts.effort === 'high',
+          schema: jsonSchema,
+        }),
+      );
+    } catch (err) {
+      if (isJsonModeError(err)) {
+        console.warn('Workers AI could not meet the JSON schema', { model, attempt });
+        continue;
+      }
+      throw workersError(err, model);
+    }
+    const answer = readWorkersOutput(output);
+    if (answer.refusal) {
+      throw new HttpError(422, 'unprocessable', 'The AI declined to help with this request.');
+    }
+    cutOff = answer.cutOff;
+    const parsed = schema.safeParse(
+      answer.json !== undefined ? answer.json : parseJsonAnswer(answer.text),
+    );
+    if (parsed.success) return { data: parsed.data, model };
+    console.warn('Workers AI answer did not match the schema', { model, attempt, cutOff });
+  }
+  throw new HttpError(
+    502,
+    'upstream_error',
+    cutOff
+      ? 'The AI answer was cut off. Try again.'
+      : 'The AI returned an answer in an unexpected shape. Try again.',
+  );
+}
+
+async function workersPlainText(
+  env: Env,
+  opts: CallOptions,
+): Promise<{ text: string; model: string }> {
+  const model = workersModel(env);
+  const user = await workersUserMessage(env, opts.content);
+  let output: unknown;
+  try {
+    output = await runWorkersAi(
+      env,
+      model,
+      workersInput(model, {
+        system: opts.system,
+        user,
+        maxTokens: opts.maxTokens,
+        thinking: opts.effort === 'high',
+      }),
+    );
+  } catch (err) {
+    throw workersError(err, model);
+  }
+  const answer = readWorkersOutput(output);
+  if (answer.refusal) {
+    throw new HttpError(422, 'unprocessable', 'The AI declined to help with this request.');
+  }
+  const text = stripThinking(answer.text);
+  if (!text) throw new HttpError(502, 'upstream_error', 'The AI returned an empty answer.');
+  return { text, model };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -260,7 +667,7 @@ export async function classifyEmailWithAi(
   const body = truncate(emailBodyText(message).replace(/\n{3,}/g, '\n\n'), 8000);
   try {
     const { data } = await structured(env, emailSchema, {
-      model: fastModel(env),
+      tier: 'fast',
       effort: 'low',
       system: EMAIL_SYSTEM,
       maxTokens: 4096,
@@ -330,12 +737,12 @@ export async function fitReport(env: Env, input: FitInput): Promise<FitReport> {
     ? 'Write the fit report, and a cover letter of 250-350 words in plain text: first person, specific to this job, using only facts from the resume, no placeholders for facts the resume lacks.'
     : 'Write the fit report. coverLetter must be null.';
   const { data, model } = await structured(env, fitReportSchema, {
-    model: smartModel(env),
+    tier: 'smart',
     effort: 'high',
     system: FIT_SYSTEM,
     maxTokens: 16000,
     content: [
-      await resumeBlock(env, input.resume),
+      { type: 'resume', resume: input.resume },
       {
         type: 'text',
         text: `Job posting: ${input.job.title} at ${input.job.company}\n\n${truncate(input.job.description, 30_000)}`,
@@ -400,7 +807,7 @@ export async function answerQuestion(env: Env, input: AnswerQuestionInput): Prom
     ? `Job: ${[input.job.title, input.job.company].filter(Boolean).join(' at ') || 'see description'}\n${truncate(input.job.description ?? '', 8000)}`
     : 'No job posting was given.';
   const { text, model } = await plainText(env, {
-    model: smartModel(env),
+    tier: 'smart',
     effort: 'medium',
     system: ANSWER_SYSTEM,
     maxTokens: 8000,
@@ -485,11 +892,14 @@ export async function draftProfileFromResume(
 ): Promise<Profile> {
   requireAi(env);
   const { data } = await structured(env, draftProfileSchema, {
-    model: smartModel(env),
+    tier: 'smart',
     effort: 'medium',
     system: PROFILE_SYSTEM,
     maxTokens: 16000,
-    content: [await resumeBlock(env, resume), { type: 'text', text: 'Extract the profile.' }],
+    content: [
+      { type: 'resume', resume },
+      { type: 'text', text: 'Extract the profile.' },
+    ],
   });
   const email = data.email?.trim();
   const merged = {
@@ -597,11 +1007,14 @@ export async function draftSearchFromResume(
 ): Promise<SavedSearchDraft> {
   requireAi(env);
   const { data } = await structured(env, searchDraftSchema, {
-    model: smartModel(env),
+    tier: 'smart',
     effort: 'medium',
     system: SEARCH_SYSTEM,
     maxTokens: 8000,
-    content: [await resumeBlock(env, resume), { type: 'text', text: 'Draft the saved search.' }],
+    content: [
+      { type: 'resume', resume },
+      { type: 'text', text: 'Draft the saved search.' },
+    ],
   });
   const titles = clipList(data.titles, 8, 80);
   if (titles.length === 0) {
@@ -650,7 +1063,7 @@ export async function rerankHits(
     excerpt: truncate((item.job.description ?? '').replace(/\s+/g, ' '), 600),
   }));
   const { data } = await structured(env, rerankSchema, {
-    model: fastModel(env),
+    tier: 'fast',
     effort: 'low',
     system: RERANK_SYSTEM,
     maxTokens: 8000,
