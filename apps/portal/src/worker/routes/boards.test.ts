@@ -9,7 +9,7 @@ import type {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../db/client';
 import { watchedBoards } from '../db/schema';
-import { markGhosted, runDailyJobs } from '../services/cron';
+import { markGhosted, runDailyJobs, syncDueBoards } from '../services/cron';
 import { createTestContext, jsonBody, type TestContext } from '../test/harness';
 
 // Synthetic Greenhouse board served by a fake upstream; `jobs` changes between syncs.
@@ -170,7 +170,8 @@ describe('watched boards, daily sync and no-response marking', () => {
       lastError: null,
       createdAt: now,
     });
-    const report = await runDailyJobs(t.env, new Date());
+    // A day later, so the board synced above is due again.
+    const report = await runDailyJobs(t.env, new Date(Date.now() + 21 * 3_600_000));
     expect(report).toMatchObject({ boardsSynced: 1, boardErrors: 1 });
     const boards = (await t.json<WatchedBoard[]>('/api/boards')).body;
     expect(boards.find((b) => b.token === 'fabrikam')?.lastError).toMatch(
@@ -219,5 +220,101 @@ describe('watched boards, daily sync and no-response marking', () => {
     expect((await t.fetch(`/api/boards/${board.id}`, { method: 'DELETE' })).status).toBe(204);
     expect((await postings()).total).toBe(0);
     expect((await t.fetch(`/api/boards/${board.id}`, { method: 'DELETE' })).status).toBe(404);
+  });
+});
+
+describe('daily board sync order and baseline (KAN-68)', () => {
+  let t: TestContext;
+  let userId: string;
+  const requested: string[] = [];
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  const batchFetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.includes('boards-api.greenhouse.io/v1/boards/contoso/jobs'))
+      return json({
+        jobs: [
+          {
+            id: 201,
+            title: 'Site Reliability Engineer',
+            absolute_url: 'https://job-boards.greenhouse.io/contoso/jobs/201',
+            location: { name: 'San Francisco, CA' },
+          },
+        ],
+      });
+    if (url.includes('api.lever.co/v0/postings/broken')) return json({}, 500);
+    if (url.includes('boards-api.greenhouse.io/v1/boards/')) return json({ jobs: [] });
+    return json({}, 404);
+  }) as typeof fetch;
+
+  const addBoard = (
+    token: string,
+    extra: Partial<typeof watchedBoards.$inferInsert> = {},
+  ): Promise<unknown> =>
+    createDb(t.env.DB)
+      .insert(watchedBoards)
+      .values({
+        id: crypto.randomUUID(),
+        userId,
+        provider: 'greenhouse',
+        token,
+        companyName: token,
+        lastSyncedAt: null,
+        lastError: null,
+        createdAt: new Date(Date.now() - 48 * 3_600_000).toISOString(),
+        ...extra,
+      });
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+  const synced = (token: string) =>
+    requested.some((u) => u.includes(`/boards/${token}/jobs`) || u.includes(`/postings/${token}`));
+
+  beforeAll(async () => {
+    t = await createTestContext({ OUTBOUND_FETCH: batchFetch });
+    userId = (await t.json<MeResponse>('/api/me')).body.user.id;
+  });
+
+  afterAll(async () => {
+    await t.dispose();
+  });
+
+  it('makes the first successful sync the baseline and skips descriptions', async () => {
+    await addBoard('contoso', { companyName: 'Contoso' });
+    const report = await syncDueBoards(createDb(t.env.DB), t.env, new Date());
+    expect(report).toEqual({ boardsSynced: 1, boardErrors: 0 });
+    expect(requested.filter((u) => u.includes('/contoso/jobs'))).toEqual([
+      'https://boards-api.greenhouse.io/v1/boards/contoso/jobs',
+    ]);
+    const list = (await t.json<ListResponse<BoardPosting>>('/api/boards/postings')).body;
+    expect(list.items.map((p) => [p.title, p.isNew])).toEqual([
+      ['Site Reliability Engineer', false],
+    ]);
+  });
+
+  it('syncs due boards up to the cap: healthy before failing, stalest first', async () => {
+    requested.length = 0;
+    await addBoard('broken', { provider: 'lever', lastError: 'Lever answered HTTP 500' });
+    await addBoard('alpha', { lastSyncedAt: hoursAgo(30) });
+    await addBoard('beta', { lastSyncedAt: hoursAgo(25) });
+    await addBoard('gamma');
+    await addBoard('fresh', { lastSyncedAt: hoursAgo(2) });
+    const db = createDb(t.env.DB);
+
+    expect(await syncDueBoards(db, t.env, new Date(), 2)).toEqual({
+      boardsSynced: 2,
+      boardErrors: 0,
+    });
+    expect(['gamma', 'alpha', 'beta', 'broken'].map(synced)).toEqual([true, true, false, false]);
+
+    expect(await syncDueBoards(db, t.env, new Date(), 2)).toEqual({
+      boardsSynced: 1,
+      boardErrors: 1,
+    });
+    expect(['beta', 'broken', 'fresh', 'contoso'].map(synced)).toEqual([true, true, false, false]);
+
+    expect(await syncDueBoards(db, t.env, new Date(), 2)).toEqual({
+      boardsSynced: 0,
+      boardErrors: 1,
+    });
   });
 });

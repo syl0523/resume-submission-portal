@@ -164,8 +164,11 @@ Row-level problems go to `errors`.
 | `POST /api/boards/postings/:id/dismiss` | –                                                             | 204                                                                                               |
 
 Open = seen in the latest sync. `isNew` = first seen after the board's baseline sync, within the last 7
-days, and not saved. Saving fetches full details with `fetchJobFromUrl` when possible. A failed sync keeps
-the previous postings and records the reason in `lastError`; the daily cron syncs every board and marks
+days, and not saved. The baseline is the board's first successful sync (on create, or the first cron sync
+of a board that has never synced). Syncs store titles, locations and links only (Greenhouse is listed
+without descriptions); saving fetches full details with `fetchJobFromUrl` when possible. A failed sync keeps
+the previous postings and records the reason in `lastError`. The daily cron syncs every board not synced in
+the last 20 hours (at most 30 a day: healthy boards first, then failing ones, oldest sync first) and marks
 active applications with no activity for `GHOST_AFTER_DAYS` (default 21) as `ghosted` (source `system`,
 `lastActivityAt` unchanged).
 

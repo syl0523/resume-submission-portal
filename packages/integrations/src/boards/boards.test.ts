@@ -49,6 +49,40 @@ describe('board URLs', () => {
 });
 
 describe('board clients', () => {
+  it('Greenhouse: lists without descriptions when asked (large boards)', async () => {
+    const seen: { url: string; headers: Headers }[] = [];
+    const fetch = fakeFetch(
+      [
+        {
+          match: '/boards/northwind/jobs',
+          body: {
+            jobs: [
+              {
+                id: 7,
+                title: 'Site Reliability Engineer',
+                absolute_url: 'https://job-boards.greenhouse.io/northwind/jobs/7',
+              },
+            ],
+          },
+        },
+      ],
+      seen,
+    );
+    const jobs = await fetchBoardJobs('greenhouse', 'northwind', {
+      fetch,
+      companyName: 'Northwind Freight',
+      descriptions: false,
+    });
+    expect(seen.map((s) => s.url)).toEqual([
+      'https://boards-api.greenhouse.io/v1/boards/northwind/jobs',
+    ]);
+    expect(jobs[0]?.job).toMatchObject({
+      title: 'Site Reliability Engineer',
+      company: 'Northwind Freight',
+    });
+    expect(jobs[0]?.job.description ?? null).toBeNull();
+  });
+
   it('Greenhouse: postings with decoded descriptions and the board name', async () => {
     const fetch = fakeFetch([
       {

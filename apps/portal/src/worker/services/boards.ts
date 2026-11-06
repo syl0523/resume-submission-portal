@@ -154,6 +154,7 @@ export async function syncBoard(
       fetch: outboundFetch(env),
       signal: AbortSignal.timeout(SYNC_TIMEOUT_MS),
       companyName: board.companyName,
+      descriptions: false,
     });
   } catch (err) {
     const message = err instanceof UpstreamError ? err.message : 'The board could not be read';
@@ -169,8 +170,11 @@ export async function syncBoard(
     .where(eq(boardPostings.boardId, board.id))
     .all();
   const existing = new Map(rows.map((r) => [r.externalId, r.id]));
+  // The first successful sync is the baseline (as when a board is added through the API): what is
+  // open then dates from when the board was added, so none of it is flagged new.
+  const firstSeenAt = board.lastSyncedAt ? now : board.createdAt;
   await runBatch(db, [
-    ...postingStatements(db, board, jobs, existing, now, now),
+    ...postingStatements(db, board, jobs, existing, now, firstSeenAt),
     db
       .update(watchedBoards)
       .set({ lastSyncedAt: now, lastError: null })

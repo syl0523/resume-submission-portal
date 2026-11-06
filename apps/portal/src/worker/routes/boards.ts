@@ -79,6 +79,7 @@ boardRoutes.post('/', validate('json', boardCreateSchema), async (c) => {
       fetch: outboundFetch(c.env),
       signal: AbortSignal.timeout(20_000),
       companyName: body.companyName ?? null,
+      descriptions: false,
     });
   } catch (err) {
     if (err instanceof UpstreamError) throw new HttpError(502, 'upstream_error', err.message);

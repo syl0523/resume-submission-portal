@@ -30,6 +30,11 @@ export interface BoardRef {
 export interface BoardFetchOptions extends FetchOptions {
   /** Employer name to put on postings when the API does not say (the watched board's name). */
   companyName?: string | null;
+  /**
+   * Include full descriptions (default true). Greenhouse sends them only on request, at several MB
+   * per large board, so a sync that stores titles and links passes false.
+   */
+  descriptions?: boolean;
 }
 
 const MAX_POSTINGS = 1000;
@@ -323,7 +328,7 @@ export async function fetchBoardJobs(
   switch (provider) {
     case 'greenhouse': {
       const data = await getJson<{ jobs?: unknown }>(
-        `${GH}/${t}/jobs?content=true`,
+        `${GH}/${t}/jobs${opts.descriptions === false ? '' : '?content=true'}`,
         opts,
         {},
         'Greenhouse',

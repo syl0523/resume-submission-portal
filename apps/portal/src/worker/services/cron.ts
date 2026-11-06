@@ -1,5 +1,5 @@
 import { ACTIVE_STATUSES } from '@jsp/core';
-import { and, inArray, lt } from 'drizzle-orm';
+import { and, asc, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { createDb, type Db } from '../db/client';
 import { applications, watchedBoards } from '../db/schema';
@@ -10,9 +10,58 @@ import { buildTransitionStatements } from './applications';
 import { syncBoard } from './boards';
 
 /**
- * The daily cron (KAN-25, 11:00 UTC): sync every watched board, mark silent applications as
- * "No response", and refresh saved searches with alerts on. One failure never stops the rest.
+ * The daily cron (KAN-25, KAN-68; 11:00 UTC): sync the watched boards that are due, mark silent
+ * applications as "No response", and refresh saved searches with alerts on. One failure never
+ * stops the rest.
  */
+
+/**
+ * Boards synced per daily run. Keeps one run inside the Workers Free plan's 50 outbound requests
+ * with room for saved-search providers; boards beyond it (stalest first) roll over to the next day.
+ */
+export const BOARDS_PER_RUN = 30;
+/** A board is due once its last successful sync is this old (boards just added are skipped). */
+export const BOARD_STALE_HOURS = 20;
+
+export interface BoardSyncReport {
+  boardsSynced: number;
+  boardErrors: number;
+}
+
+/**
+ * Sync up to `limit` due boards: never-synced and stale ones, healthy boards before failing ones
+ * (so a few broken boards cannot starve the rest), oldest sync first.
+ */
+export async function syncDueBoards(
+  db: Db,
+  env: Env,
+  now: Date,
+  limit = BOARDS_PER_RUN,
+): Promise<BoardSyncReport> {
+  const cutoff = new Date(now.getTime() - BOARD_STALE_HOURS * 3_600_000).toISOString();
+  const due = await db
+    .select()
+    .from(watchedBoards)
+    .where(or(isNull(watchedBoards.lastSyncedAt), lt(watchedBoards.lastSyncedAt, cutoff)))
+    .orderBy(
+      sql`${watchedBoards.lastError} is not null`,
+      sql`coalesce(${watchedBoards.lastSyncedAt}, '')`,
+      asc(watchedBoards.createdAt),
+    )
+    .limit(limit)
+    .all();
+  const report: BoardSyncReport = { boardsSynced: 0, boardErrors: 0 };
+  for (const board of due) {
+    try {
+      await syncBoard(db, env, board, now.toISOString());
+      report.boardsSynced += 1;
+    } catch (err) {
+      report.boardErrors += 1;
+      console.warn(`Board ${board.provider}/${board.token} failed to sync`, describeError(err));
+    }
+  }
+  return report;
+}
 
 export interface DailyReport {
   boardsSynced: number;
@@ -87,15 +136,10 @@ export async function runDailyJobs(
     searchErrors: 0,
   };
 
-  const boards = await db.select().from(watchedBoards).all();
-  for (const board of boards) {
-    try {
-      await syncBoard(db, env, board, now.toISOString());
-      report.boardsSynced += 1;
-    } catch (err) {
-      report.boardErrors += 1;
-      console.warn(`Board ${board.provider}/${board.token} failed to sync`, describeError(err));
-    }
+  try {
+    Object.assign(report, await syncDueBoards(db, env, now));
+  } catch (err) {
+    console.error('Board sync failed', describeError(err));
   }
 
   try {
