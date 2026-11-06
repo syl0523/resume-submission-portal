@@ -15,5 +15,6 @@ export * from './search/muse';
 export * from './search/plan';
 export * from './search/types';
 export * from './search/usajobs';
+export * from './search/websearch';
 export * from './text';
 export * from './url';

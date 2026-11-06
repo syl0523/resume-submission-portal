@@ -120,8 +120,17 @@ export type BoardProvider = (typeof BOARD_PROVIDERS)[number];
  * - usajobs: USAJOBS, US federal jobs (official API)
  * - boards: open postings on the company boards you watch
  * - muse: The Muse public jobs API (no key; filtered by title locally, since it has no keyword search)
+ * - websearch: Claude's web search over careers sites and ATS boards (needs ANTHROPIC_API_KEY;
+ *   manual runs only, never the daily refresh; in Discover only when picked as the source)
  */
-export const SEARCH_PROVIDERS = ['jsearch', 'adzuna', 'usajobs', 'boards', 'muse'] as const;
+export const SEARCH_PROVIDERS = [
+  'jsearch',
+  'adzuna',
+  'usajobs',
+  'boards',
+  'muse',
+  'websearch',
+] as const;
 export type SearchProvider = (typeof SEARCH_PROVIDERS)[number];
 
 /** Work arrangement preference in a search profile. */

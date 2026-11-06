@@ -16,7 +16,9 @@ export const discoverRoutes = new Hono<AppEnv>().get(
   validate('query', discoverQuerySchema),
   async (c) => {
     const q = c.req.valid('query');
-    const providers = q.provider === 'all' ? SEARCH_PROVIDERS : [q.provider];
+    // Claude web search is slow and paid per search: only when picked as the source (KAN-63).
+    const providers =
+      q.provider === 'all' ? SEARCH_PROVIDERS.filter((p) => p !== 'websearch') : [q.provider];
     // Empty `where`: the default place (KAN-65), unless the search is remote-only (US-wide).
     // "United States" searches the whole country; a metro alias becomes the metro's name.
     const where = q.where ? canonicalPlace(q.where) : q.remote ? null : DEFAULT_SEARCH_LOCATION;

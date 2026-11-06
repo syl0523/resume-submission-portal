@@ -64,7 +64,10 @@ export async function runSavedSearch(
   const now = (opts.now ?? new Date()).toISOString();
   const criteria = criteriaOf(search);
   const queries = planQueries(criteria, opts.maxQueries);
-  const providers = opts.providers ?? [...SEARCH_PROVIDERS];
+  // Claude web search costs per search: manual runs only, never the daily refresh (KAN-63).
+  const providers = (opts.providers ?? [...SEARCH_PROVIDERS]).filter(
+    (p) => !(opts.scheduled && p === 'websearch'),
+  );
 
   const { items, outcomes } = await fanOut(db, env, userId, queries, providers, {
     scheduled: opts.scheduled,

@@ -31,6 +31,7 @@ const PROVIDER_LABEL: Record<SearchProvider, string> = {
   usajobs: 'USAJOBS',
   boards: 'Your company boards',
   muse: 'The Muse',
+  websearch: 'Claude web search (careers sites, slower)',
 };
 
 function Result({ item }: { item: DiscoverItem }) {

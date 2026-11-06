@@ -6,6 +6,9 @@ import type {
   SavedSearchDraft,
 } from '@jsp/core';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createDb } from '../db/client';
+import { refreshAlertSearches } from '../services/jobmatch';
+import { providerAvailability } from '../services/search';
 import { createTestContext, jsonBody, type TestContext } from '../test/harness';
 
 // Search sources and defaults that need a fake Messages API (synthetic data only).
@@ -38,7 +41,19 @@ const fakeFetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
   seen.push({ url, body });
   if (url.includes('api.anthropic.com')) {
-    const reply = replies.shift();
+    const reply = replies.shift() as { __status?: number } | undefined;
+    if (reply?.__status) {
+      return new Response(
+        JSON.stringify({
+          type: 'error',
+          error: { type: 'rate_limit_error', message: 'Slow down' },
+        }),
+        {
+          status: reply.__status,
+          headers: { 'content-type': 'application/json', 'retry-after-ms': '1' },
+        },
+      );
+    }
     return reply
       ? json(reply)
       : json({ type: 'error', error: { type: 'api_error', message: 'no reply queued' } }, 500);
@@ -174,4 +189,185 @@ describe('search defaults with AI (fake Messages API)', () => {
     expect(body.providers).toEqual([{ provider: 'muse', total: 1, error: null }]);
     expect(body.items.map((i) => i.sourceLabel)).toEqual(['The Muse']);
   });
+
+  it('searches careers sites with Claude web search on manual runs', async () => {
+    const created = await t.json<SavedSearch>(
+      '/api/searches',
+      jsonBody('POST', {
+        name: 'SRE via web search',
+        titles: ['SRE Lead', 'Incident Manager'],
+        skills: ['PagerDuty'],
+        keywords: [],
+        excludeKeywords: [],
+        alertsEnabled: false,
+      }),
+    );
+    replies.push(
+      webSearchReply(
+        'srvtoolu_1',
+        [GREENHOUSE_URL, LINKEDIN_URL],
+        [
+          reported(GREENHOUSE_URL, 'Site Reliability Engineer'),
+          reported(LINKEDIN_URL, 'SRE'),
+          reported('https://jobs.apple.com/en-us/details/200500999/sre', 'SRE (not a result)'),
+        ],
+      ),
+      webSearchReply('srvtoolu_2', [META_URL], [reported(META_URL, 'Production Engineer')]),
+    );
+    const { status, body } = await t.json<RunSearchResponse>(
+      `/api/searches/${created.body.id}/run`,
+      jsonBody('POST', { providers: ['websearch'], maxQueries: 4 }),
+    );
+    expect(status).toBe(200);
+    expect(body.providers).toEqual([{ provider: 'websearch', total: 2, error: null }]);
+    expect(body.hits.map((h) => h.job.url).sort()).toEqual([
+      'https://job-boards.greenhouse.io/examplepay/jobs/4000001',
+      'https://www.metacareers.com/jobs/1000000001',
+    ]);
+    expect(body.hits.every((h) => h.sourceLabel === 'Web search')).toBe(true);
+
+    // One Claude request per query, capped at two queries per run.
+    const calls = seen.filter((s) => s.url.includes('api.anthropic.com'));
+    expect(calls).toHaveLength(2);
+    const request = calls[0]?.body as {
+      model: string;
+      tools: Record<string, unknown>[];
+      messages: { content: string }[];
+    };
+    expect(request.model).toBe('claude-haiku-5-5');
+    expect(request.tools[0]).toMatchObject({
+      type: 'web_search_20260318',
+      name: 'web_search',
+      max_uses: 3,
+      allowed_callers: ['direct'],
+      user_location: { type: 'approximate', city: 'San Francisco', country: 'US' },
+    });
+    const domains = request.tools[0]?.allowed_domains as string[];
+    expect(domains).toEqual(
+      expect.arrayContaining(['amazon.jobs', 'myworkdayjobs.com', 'job-boards.greenhouse.io']),
+    );
+    expect(domains.some((d) => /linkedin|indeed/.test(d))).toBe(false);
+    expect(request.tools[1]).toMatchObject({ name: 'record_job_postings', strict: true });
+    expect(request.messages[0]?.content).toContain('in or near San Francisco Bay Area');
+  });
+
+  it('continues a paused search turn, and only uses web search when picked in Discover', async () => {
+    replies.push(
+      message(
+        [serverToolUse('srvtoolu_3'), searchResults('srvtoolu_3', [GREENHOUSE_URL])],
+        'pause_turn',
+      ),
+      message(
+        [
+          {
+            type: 'tool_use',
+            id: 'toolu_9',
+            name: 'record_job_postings',
+            input: { postings: [reported(GREENHOUSE_URL, 'Incident Manager')] },
+          },
+        ],
+        'tool_use',
+      ),
+    );
+    const picked = await t.json<DiscoverResponse>(
+      '/api/discover?q=Incident+Manager&provider=websearch',
+    );
+    expect(picked.body.providers).toEqual([{ provider: 'websearch', total: 1, error: null }]);
+    expect(picked.body.items[0]?.job).toMatchObject({
+      title: 'Incident Manager',
+      source: 'greenhouse',
+    });
+    const calls = seen.filter((s) => s.url.includes('api.anthropic.com'));
+    expect(calls).toHaveLength(2);
+    const continued = calls[1]?.body as { messages: { role: string }[] };
+    expect(continued.messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+
+    seen.length = 0;
+    const all = await t.json<DiscoverResponse>('/api/discover?q=Incident+Manager');
+    expect(all.body.providers.map((p) => p.provider)).not.toContain('websearch');
+    // Page 2 never pays for another web search.
+    const page2 = await t.json<DiscoverResponse>(
+      '/api/discover?q=Incident+Manager&provider=websearch&page=2',
+    );
+    expect(page2.body.providers).toEqual([{ provider: 'websearch', total: 0, error: null }]);
+    expect(seen.some((s) => s.url.includes('api.anthropic.com'))).toBe(false);
+  });
+
+  it('skips web search in the daily refresh and without an Anthropic key', async () => {
+    const result = await refreshAlertSearches(createDb(t.env.DB), t.env, new Date());
+    expect(result.errors).toBe(0);
+    expect(result.run).toBeGreaterThan(0);
+    expect(seen.some((s) => s.url.includes('api.anthropic.com'))).toBe(false);
+    expect(seen.some((s) => s.url.includes('themuse.com'))).toBe(true);
+    expect(providerAvailability({ ...t.env, ANTHROPIC_API_KEY: ' ' }).websearch).toBe(false);
+    expect(providerAvailability(t.env).websearch).toBe(true);
+  });
+
+  it('reports web search failures without failing the run', async () => {
+    replies.push({ __status: 429 }, { __status: 429 });
+    const { status, body } = await t.json<DiscoverResponse>(
+      '/api/discover?q=SRE&provider=websearch',
+    );
+    expect(status).toBe(200);
+    expect(body.providers[0]).toMatchObject({ provider: 'websearch', total: 0 });
+    expect(body.providers[0]?.error).toMatch(/rate limited/);
+  });
 });
+
+const GREENHOUSE_URL = 'https://job-boards.greenhouse.io/examplepay/jobs/4000001';
+const META_URL = 'https://www.metacareers.com/jobs/1000000001/';
+const LINKEDIN_URL = 'https://www.linkedin.com/jobs/view/4000000002/';
+
+function reported(url: string, title: string) {
+  return {
+    title,
+    company: 'Example Payments',
+    location: 'San Francisco, CA',
+    url,
+    postedAt: '2026-11-01',
+    snippet: 'Own reliability and incident response for payments.',
+  };
+}
+
+function serverToolUse(id: string) {
+  return {
+    type: 'server_tool_use',
+    id,
+    name: 'web_search',
+    input: { query: 'site reliability engineer jobs San Francisco' },
+    caller: { type: 'direct' },
+  };
+}
+
+function searchResults(id: string, urls: string[]) {
+  return {
+    type: 'web_search_tool_result',
+    tool_use_id: id,
+    caller: { type: 'direct' },
+    content: urls.map((url) => ({
+      type: 'web_search_result',
+      url,
+      title: 'Job posting',
+      encrypted_content: 'synthetic',
+      page_age: null,
+    })),
+  };
+}
+
+function webSearchReply(id: string, urls: string[], postings: unknown[]) {
+  return message(
+    [
+      serverToolUse(id),
+      searchResults(id, urls),
+      { type: 'text', text: 'Here is what I found.' },
+      {
+        type: 'tool_use',
+        id: `toolu_${id}`,
+        name: 'record_job_postings',
+        input: { postings },
+        caller: { type: 'direct' },
+      },
+    ],
+    'tool_use',
+  );
+}

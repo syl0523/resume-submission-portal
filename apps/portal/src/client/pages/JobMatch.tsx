@@ -7,6 +7,7 @@ import {
   type SavedSearch,
   type SavedSearchDraft,
   type SavedSearchRequest,
+  SEARCH_PROVIDERS,
   SENIORITY_LEVELS,
   type SearchHit,
   type SearchProvider,
@@ -117,7 +118,11 @@ const PROVIDER_LABEL: Record<SearchProvider, string> = {
   usajobs: 'USAJOBS',
   boards: 'Company boards',
   muse: 'The Muse',
+  websearch: 'Web search (careers sites)',
 };
+
+/** Every source except Claude web search (for runs without it). */
+const WITHOUT_WEB_SEARCH = SEARCH_PROVIDERS.filter((p) => p !== 'websearch');
 
 function toRequest(f: FormState): SavedSearchRequest {
   return {
@@ -557,6 +562,7 @@ export function SearchDetail() {
   const { data: search, error, isLoading } = useSearch(id);
   const [onlyNew, setOnlyNew] = useState(false);
   const [aiRerank, setAiRerank] = useState(false);
+  const [webSearch, setWebSearch] = useState(true);
   const [editing, setEditing] = useState(false);
   const [lastRun, setLastRun] = useState<RunSearchResponse | null>(null);
   const hits = useHits(id, { onlyNew, sort: 'fit' });
@@ -567,7 +573,12 @@ export function SearchDetail() {
     void qc.invalidateQueries({ queryKey: keys.stats });
   };
   const run = useMutation({
-    mutationFn: () => post<RunSearchResponse>(`/api/searches/${id}/run`, { aiRerank }),
+    mutationFn: () =>
+      post<RunSearchResponse>(`/api/searches/${id}/run`, {
+        aiRerank,
+        // Omitted = every configured source, Claude web search included.
+        providers: me?.features.ai && !webSearch ? WITHOUT_WEB_SEARCH : undefined,
+      }),
     onSuccess: (r) => {
       setLastRun(r);
       refresh();
@@ -614,11 +625,18 @@ export function SearchDetail() {
       <div className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center gap-3">
           {me?.features.ai ? (
-            <Checkbox
-              label="Re-rank the top 20 with AI"
-              checked={aiRerank}
-              onChange={(e) => setAiRerank(e.target.checked)}
-            />
+            <>
+              <Checkbox
+                label="Re-rank the top 20 with AI"
+                checked={aiRerank}
+                onChange={(e) => setAiRerank(e.target.checked)}
+              />
+              <Checkbox
+                label="Search careers sites with Claude (slower, uses AI credits)"
+                checked={webSearch}
+                onChange={(e) => setWebSearch(e.target.checked)}
+              />
+            </>
           ) : null}
           <Checkbox
             label="New only"

@@ -14,10 +14,17 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { applications, boardPostings, jobs, watchedBoards } from '../db/schema';
 import { type Env, outboundFetch } from '../env';
+import {
+  searchWeb,
+  WEB_SEARCH_MAX_QUERIES,
+  WEB_SEARCH_TIMEOUT_MS,
+  webSearchEnabled,
+} from './websearch';
 
 /**
  * Provider fan-out shared by Discover and Job Match runs (docs/api.md): every requested provider
- * that is configured, in parallel, 10 s per call. One failing provider never fails the search.
+ * that is configured, in parallel, 10 s per call (The Muse 15 s for its pages, Claude web search
+ * 90 s). One failing provider never fails the search.
  */
 
 export interface FoundItem extends SearchResultItem {
@@ -47,6 +54,8 @@ export function providerAvailability(env: Env): Record<SearchProvider, boolean> 
     boards: true,
     // Public API, no key (KAN-66).
     muse: true,
+    // Claude web search (KAN-63): billed to the Anthropic key, so the key itself is required.
+    websearch: webSearchEnabled(env),
   };
 }
 
@@ -127,6 +136,11 @@ export async function fanOut(
 
   const callsFor = (provider: SearchProvider): (() => Promise<SearchResult>)[] => {
     if (provider === 'muse') return [museCall];
+    if (provider === 'websearch') {
+      // Paid per search: manual runs only, first page only, the most important queries only.
+      if (opts.scheduled || (queries[0]?.page ?? 1) > 1) return [];
+      return queries.slice(0, WEB_SEARCH_MAX_QUERIES).map((q) => () => call(provider, q));
+    }
     return queries.map((q) => () => call(provider, q));
   };
 
@@ -177,6 +191,8 @@ export async function fanOut(
         return searchBoards(db, userId, [q]);
       case 'muse':
         return museCall();
+      case 'websearch':
+        return searchWeb(env, q, { signal: AbortSignal.timeout(WEB_SEARCH_TIMEOUT_MS) });
     }
   };
 
