@@ -168,8 +168,8 @@ Open = seen in the latest sync. `isNew` = first seen after the board's baseline 
 days, and not saved. The baseline is the board's first successful sync (on create, or the first cron sync
 of a board that has never synced). Syncs store titles, locations and links only (Greenhouse is listed
 without descriptions); saving fetches full details with `fetchJobFromUrl` when possible. A failed sync keeps
-the previous postings and records the reason in `lastError`. The daily cron syncs every board not synced in
-the last 20 hours (at most 30 a day: healthy boards first, then failing ones, oldest sync first) and marks
+the previous postings and records the reason in `lastError`. The weekly cron (Mondays 11:00 UTC) syncs every board not synced in
+the last 20 hours (at most 30 per run: healthy boards first, then failing ones, oldest sync first) and marks
 active applications with no activity for `GHOST_AFTER_DAYS` (default 21) as `ghosted` (source `system`,
 `lastActivityAt` unchanged).
 
@@ -212,13 +212,13 @@ How a run works (`POST /api/searches/:id/run`):
    - `boards`: open postings on watched company boards, filtered locally by title similarity and location.
    - `muse` (KAN-66): The Muse public API, no key. It has no keyword search, so titles map to Muse categories
      (at most 3) and postings are kept when their title resembles a target; 2 pages per category (1 in the
-     daily cron), 15 s timeout.
+     weekly cron), 15 s timeout.
    - `websearch` (KAN-63): Claude's web search, restricted to employers' careers sites (Google, Microsoft,
      Amazon, Apple, Meta, Netflix, Salesforce, Uber) and ATS boards (Workday, Greenhouse, Lever, Ashby,
      SmartRecruiters); never LinkedIn or Indeed. Needs `ANTHROPIC_API_KEY` (Workers AI cannot search the
      web). At most 2 queries per run and 3 searches per query on `AI_MODEL_FAST`, 90 s timeout. A posting is
      kept only when its URL is on an allowed site and appeared in the search results. Manual runs only, never
-     the daily cron; leave it out of a run with `providers`.
+     the weekly cron; leave it out of a run with `providers`.
 
    Unconfigured providers report `error: "not_configured"`; one failing provider never fails the run.
 3. `dedupeJobs` merges the same job seen on several sites (URL key, then company + similar title + location),
@@ -231,7 +231,7 @@ How a run works (`POST /api/searches/:id/run`):
    Update `lastRunAt`.
 7. Return this run's hits ranked by fit (AI score where present), excluded last, plus `deepLinks`.
 
-The daily cron runs every search with `alertsEnabled` (at most 2 queries per provider, to protect quotas).
+The weekly cron (Mondays 11:00 UTC) runs every search with `alertsEnabled` (at most 2 queries per provider, to protect quotas).
 `DashboardStats.newMatches` counts new, undismissed, unsaved hits.
 
 `POST /api/searches/draft-from-resume` sends the resume to the AI engine (Claude: PDF as a document block;

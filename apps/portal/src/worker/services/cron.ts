@@ -10,14 +10,14 @@ import { buildTransitionStatements } from './applications';
 import { boardSyncOrder, syncBoards } from './boards';
 
 /**
- * The daily cron (KAN-25, KAN-68; 11:00 UTC): sync the watched boards that are due, mark silent
+ * The weekly cron (KAN-25, KAN-68, KAN-70; Mondays 11:00 UTC): sync the watched boards that are due, mark silent
  * applications as "No response", and refresh saved searches with alerts on. One failure never
  * stops the rest.
  */
 
 /**
- * Boards synced per daily run. Keeps one run inside the Workers Free plan's 50 outbound requests
- * with room for saved-search providers; boards beyond it (stalest first) roll over to the next day.
+ * Boards synced per scheduled run. Keeps one run inside the Workers Free plan's 50 outbound requests
+ * with room for saved-search providers; boards beyond it (stalest first) roll over to the next run.
  */
 export const BOARDS_PER_RUN = 30;
 /** A board is due once its last successful sync is this old (boards just added are skipped). */
@@ -50,7 +50,7 @@ export async function syncDueBoards(
   return { boardsSynced: synced, boardErrors: failed };
 }
 
-export interface DailyReport {
+export interface ScheduledReport {
   boardsSynced: number;
   boardErrors: number;
   ghosted: number;
@@ -109,13 +109,13 @@ export async function markGhosted(db: Db, env: Env, now: Date): Promise<number> 
   return ghosted;
 }
 
-export async function runDailyJobs(
+export async function runScheduledJobs(
   env: Env,
   now: Date = new Date(),
   refreshSearches?: SearchRefresher,
-): Promise<DailyReport> {
+): Promise<ScheduledReport> {
   const db = createDb(env.DB);
-  const report: DailyReport = {
+  const report: ScheduledReport = {
     boardsSynced: 0,
     boardErrors: 0,
     ghosted: 0,

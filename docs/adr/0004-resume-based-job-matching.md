@@ -39,7 +39,7 @@ resume, with a focus on US jobs.
   employer's own apply link.
 - **Work-authorization signals:** postings that say no sponsorship, US citizens only or clearance required are
   flagged, and excluded when the search says sponsorship is needed.
-- **Quota safety:** at most `maxQueries` (default 4) queries per provider per manual run, 2 for the daily cron.
+- **Quota safety:** at most `maxQueries` (default 4) queries per provider per manual run, 2 for the weekly cron.
 
 ## Consequences
 

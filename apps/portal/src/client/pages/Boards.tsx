@@ -245,7 +245,7 @@ export function Boards() {
     <>
       <PageHeader
         title="Company boards"
-        subtitle="Watch the careers pages of companies you like; new openings are flagged every morning."
+        subtitle="Watch the careers pages of companies you like; new openings are flagged every Monday morning, or press Sync all."
       />
       <div className="flex flex-col gap-5">
         <AddBoard />

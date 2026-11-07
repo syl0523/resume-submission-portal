@@ -27,12 +27,13 @@
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "resume-submission-portal-files" }],
 
   // Workers AI: runs the AI features when ANTHROPIC_API_KEY is not set (Claude is preferred when it
-  // is). Always runs on your Cloudflare account, also in local dev (so `pnpm dev` needs
-  // `wrangler login`); usage beyond the 10,000 free Neurons a day is billed.
+  // is). Always runs on your Cloudflare account; in local dev only under `pnpm dev:remote` (needs
+  // `wrangler login`). Usage beyond the 10,000 free Neurons a day is billed.
   "ai": { "binding": "AI", "remote": true },
 
-  // Daily at 11:00 UTC (6-7am Toronto): watched-board sync, no-response marking, saved-search alerts.
-  "triggers": { "crons": ["0 11 * * *"] },
+  // Weekly, Mondays at 11:00 UTC (6-7am Toronto): watched-board sync, no-response marking, saved-search
+  // alerts. MON rather than a number: Cloudflare counts weekdays from 1 = Sunday.
+  "triggers": { "crons": ["0 11 * * MON"] },
 
   "vars": {
     // "access" = Cloudflare Access in front of the portal (production). Local dev overrides

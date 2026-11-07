@@ -296,7 +296,7 @@ export const boardPostings = sqliteTable(
   ],
 );
 
-/** Saved searches (Job Match tracks): criteria drafted from a resume, refreshed daily when alertsEnabled. */
+/** Saved searches (Job Match tracks): criteria drafted from a resume, refreshed weekly when alertsEnabled. */
 export const savedSearches = sqliteTable(
   'saved_searches',
   {

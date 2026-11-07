@@ -24,7 +24,7 @@ import { type Env, outboundFetch } from '../env';
  * Indeed) and reports open postings through a strict client tool; every reported URL must be one
  * of the search results. Costs a web search fee per search plus tokens, so it is capped
  * (WEB_SEARCH_MAX_USES searches per query, WEB_SEARCH_MAX_QUERIES queries per run) and only runs
- * on manual runs, never in the daily refresh.
+ * on manual runs, never in the weekly refresh.
  *
  * Web search docs: https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool
  */

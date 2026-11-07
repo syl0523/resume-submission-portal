@@ -1,7 +1,7 @@
 # Working in this repo
 
 Resume Submission Portal: a personal job-application portal. One Cloudflare Worker serves the REST API, the
-React app, an inbound-email handler and a daily cron. A Chrome extension clips job pages and autofills
+React app, an inbound-email handler and a weekly cron. A Chrome extension clips job pages and autofills
 company application forms. See `docs/architecture.md` for the why, `docs/api.md` for the contract.
 
 ## Layout

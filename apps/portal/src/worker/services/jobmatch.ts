@@ -35,7 +35,7 @@ export interface RunOptions {
   aiRerank: boolean;
   maxQueries: number;
   now?: Date;
-  /** The daily refresh (not a manual run): fewer pages, no paid AI sources. */
+  /** The weekly refresh (not a manual run): fewer pages, no paid AI sources. */
   scheduled?: boolean;
 }
 
@@ -64,7 +64,7 @@ export async function runSavedSearch(
   const now = (opts.now ?? new Date()).toISOString();
   const criteria = criteriaOf(search);
   const queries = planQueries(criteria, opts.maxQueries);
-  // Claude web search costs per search: manual runs only, never the daily refresh (KAN-63).
+  // Claude web search costs per search: manual runs only, never the weekly refresh (KAN-63).
   const providers = (opts.providers ?? [...SEARCH_PROVIDERS]).filter(
     (p) => !(opts.scheduled && p === 'websearch'),
   );
@@ -189,7 +189,7 @@ export async function runSavedSearch(
   };
 }
 
-/** Daily refresh of every saved search with alerts on (2 queries per provider, no AI). */
+/** Weekly refresh of every saved search with alerts on (2 queries per provider, no AI). */
 export async function refreshAlertSearches(
   db: Db,
   env: Env,

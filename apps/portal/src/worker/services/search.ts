@@ -32,7 +32,7 @@ export interface FoundItem extends SearchResultItem {
 }
 
 const CALL_TIMEOUT_MS = 10_000;
-/** The Muse: pages per category for manual runs and Discover, and for the daily refresh. */
+/** The Muse: pages per category for manual runs and Discover, and for the weekly refresh. */
 const MUSE_PAGES = 2;
 const MUSE_PAGES_SCHEDULED = 1;
 const MUSE_TIMEOUT_MS = 15_000;
@@ -40,7 +40,7 @@ const MUSE_TIMEOUT_MS = 15_000;
 export interface FanOutOptions {
   /** Adzuna country index. */
   country?: string;
-  /** The daily refresh: fewer pages, no paid AI sources. */
+  /** The weekly refresh: fewer pages, no paid AI sources. */
   scheduled?: boolean;
   /** Discover keyword search: sources without keyword search also match descriptions. */
   keywordSearch?: boolean;

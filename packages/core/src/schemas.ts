@@ -285,7 +285,7 @@ export const searchProfileSchema = z.object({
   summary: z.string().trim().max(1000).nullish(),
 });
 
-/** A named search track ("HR Manager, remote US"), refreshed daily when alerts are on. */
+/** A named search track ("HR Manager, remote US"), refreshed weekly when alerts are on. */
 export const savedSearchSchema = searchProfileSchema.extend({
   name: z.string().trim().min(1).max(80),
   alertsEnabled: z.boolean().default(true),

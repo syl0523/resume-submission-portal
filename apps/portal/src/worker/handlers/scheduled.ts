@@ -1,14 +1,18 @@
 import type { Env } from '../env';
-import { runDailyJobs } from '../services/cron';
+import { runScheduledJobs } from '../services/cron';
 import { refreshAlertSearches } from '../services/jobmatch';
 
-/** Daily cron (wrangler.jsonc triggers.crons, 11:00 UTC). See services/cron.ts. */
+/** Weekly cron (wrangler.jsonc triggers.crons, Mondays 11:00 UTC). See services/cron.ts. */
 export async function handleScheduled(
   controller: ScheduledController,
   env: Env,
   ctx: ExecutionContext,
 ): Promise<void> {
   void ctx;
-  const report = await runDailyJobs(env, new Date(controller.scheduledTime), refreshAlertSearches);
-  console.log('Daily jobs finished', controller.cron, JSON.stringify(report));
+  const report = await runScheduledJobs(
+    env,
+    new Date(controller.scheduledTime),
+    refreshAlertSearches,
+  );
+  console.log('Scheduled jobs finished', controller.cron, JSON.stringify(report));
 }

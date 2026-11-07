@@ -337,7 +337,7 @@ function SearchForm({
             onChange={(e) => set('needsSponsorship', e.target.checked)}
           />
           <Checkbox
-            label="Refresh daily and flag new matches"
+            label="Refresh weekly and flag new matches"
             checked={f.alertsEnabled}
             onChange={(e) => set('alertsEnabled', e.target.checked)}
           />

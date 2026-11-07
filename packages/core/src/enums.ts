@@ -121,7 +121,7 @@ export type BoardProvider = (typeof BOARD_PROVIDERS)[number];
  * - boards: open postings on the company boards you watch
  * - muse: The Muse public jobs API (no key; filtered by title locally, since it has no keyword search)
  * - websearch: Claude's web search over careers sites and ATS boards (needs ANTHROPIC_API_KEY;
- *   manual runs only, never the daily refresh; in Discover only when picked as the source)
+ *   manual runs only, never the weekly refresh; in Discover only when picked as the source)
  */
 export const SEARCH_PROVIDERS = [
   'jsearch',

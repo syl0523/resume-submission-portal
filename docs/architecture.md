@@ -8,7 +8,7 @@ A personal portal for a US-focused job search:
    LinkedIn, Indeed and company sites (via the JSearch aggregator of Google for Jobs), Adzuna US, USAJOBS,
    The Muse, big-tech careers sites and ATS boards (Claude web search) and watched company boards; San
    Francisco Bay Area by default; deduped across sites, flagged for sponsorship/clearance language, ranked by
-   a resume-fit score, refreshed daily with "new since yesterday".
+   a resume-fit score, refreshed weekly with "new since last week".
 2. **Apply** with assisted apply: a browser extension saves any posting in one click (with its fit score) and
    autofills company application forms (Greenhouse, Lever, Ashby) from a full profile (work history,
    education, saved answers) for you to review and submit; AI drafts answers to open questions.
@@ -39,7 +39,7 @@ flowchart LR
     A[Access: sign-in]
     W[Worker: Hono API + React app]
     E[email handler]
-    C[daily cron]
+    C[weekly cron]
     D[(D1: SQLite)]
     R[(R2: resumes, raw emails)]
   end
@@ -68,7 +68,7 @@ One Worker, three entry points:
 | ----------- | ---------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `fetch`     | HTTP                                                 | `/api/*` REST API (Hono); everything else serves the React app from static assets |
 | `email`     | Cloudflare Email Routing (`jobs-xxxx@jobs.<domain>`) | Parse, classify, match, update status                                             |
-| `scheduled` | Cron, daily 11:00 UTC                                | Sync watched boards, mark long-silent applications "No response"                  |
+| `scheduled` | Cron, Mondays 11:00 UTC                              | Sync watched boards, mark long-silent applications "No response"                  |
 
 ## Code layout
 
@@ -183,15 +183,15 @@ Design review on 2026-11-03 (focus: resume submission, job hunting, one-stop por
 
 Built in v1 (this release):
 
-| Area              | Feature                                                                                                                                                                                       |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Job hunting       | Saved searches from the resume, multi-source search, cross-source dedupe, fit score with sponsorship/clearance flags, daily refresh with new-hit tracking, deep links, watched company boards |
-| Resume submission | Immutable resume versions, full autofill profile drafted from the resume, ATS autofill, AI answers to application questions, AI fit report and cover letter                                   |
-| Tracking          | Email-driven status, Inbox review, LinkedIn history import, interview calendar feed, follow-up dates, dashboard, CSV export                                                                   |
+| Area              | Feature                                                                                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Job hunting       | Saved searches from the resume, multi-source search, cross-source dedupe, fit score with sponsorship/clearance flags, weekly refresh with new-hit tracking, deep links, watched company boards |
+| Resume submission | Immutable resume versions, full autofill profile drafted from the resume, ATS autofill, AI answers to application questions, AI fit report and cover letter                                    |
+| Tracking          | Email-driven status, Inbox review, LinkedIn history import, interview calendar feed, follow-up dates, dashboard, CSV export                                                                    |
 
 Added 2026-11-05: The Muse (keyless) and Claude web search over big-tech careers sites and ATS boards as
 search sources (KAN-66, KAN-63), San Francisco Bay Area as the default place (KAN-65), Workers AI when no
-Anthropic key is set (KAN-67), and a daily board sync that scales to dozens of watched boards (KAN-68).
+Anthropic key is set (KAN-67), and a board sync that scales to dozens of watched boards (KAN-68).
 
 Next (Jira epic "Phase 2"):
 

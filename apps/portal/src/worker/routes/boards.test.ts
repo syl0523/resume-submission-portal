@@ -10,7 +10,7 @@ import type {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from '../db/client';
 import { watchedBoards } from '../db/schema';
-import { markGhosted, runDailyJobs, syncDueBoards } from '../services/cron';
+import { markGhosted, runScheduledJobs, syncDueBoards } from '../services/cron';
 import { createTestContext, jsonBody, type TestContext } from '../test/harness';
 
 // Synthetic Greenhouse board served by a fake upstream; `jobs` changes between syncs.
@@ -50,7 +50,7 @@ const fakeFetch = (async (input: RequestInfo | URL) => {
   return json({}, 404);
 }) as typeof fetch;
 
-describe('watched boards, daily sync and no-response marking', () => {
+describe('watched boards, scheduled sync and no-response marking', () => {
   let t: TestContext;
   let board: WatchedBoard;
 
@@ -157,7 +157,7 @@ describe('watched boards, daily sync and no-response marking', () => {
     expect((await postings()).items.map((p) => p.title)).toEqual(['Talent Acquisition Partner']);
   });
 
-  it('the daily job syncs every board, records failures and keeps going', async () => {
+  it('the scheduled job syncs every board, records failures and keeps going', async () => {
     const db = createDb(t.env.DB);
     const me = await t.json<MeResponse>('/api/me');
     const now = new Date().toISOString();
@@ -172,7 +172,7 @@ describe('watched boards, daily sync and no-response marking', () => {
       createdAt: now,
     });
     // A day later, so the board synced above is due again.
-    const report = await runDailyJobs(t.env, new Date(Date.now() + 21 * 3_600_000));
+    const report = await runScheduledJobs(t.env, new Date(Date.now() + 21 * 3_600_000));
     expect(report).toMatchObject({ boardsSynced: 1, boardErrors: 1 });
     const boards = (await t.json<WatchedBoard[]>('/api/boards')).body;
     expect(boards.find((b) => b.token === 'fabrikam')?.lastError).toMatch(
@@ -224,7 +224,7 @@ describe('watched boards, daily sync and no-response marking', () => {
   });
 });
 
-describe('daily board sync order and baseline (KAN-68)', () => {
+describe('scheduled board sync order and baseline (KAN-68)', () => {
   let t: TestContext;
   let userId: string;
   const requested: string[] = [];
