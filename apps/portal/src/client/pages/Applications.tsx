@@ -18,7 +18,7 @@ import {
 } from '@jsp/core';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
-import { Download, Kanban, List, Plus } from 'lucide-react';
+import { Download, Kanban, List, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
@@ -32,7 +32,7 @@ import {
   Spinner,
   StatusBadge,
 } from '../components/ui';
-import { post, qs } from '../lib/api';
+import { del, post, qs } from '../lib/api';
 import { formatSalary, relativeDay, SOURCE_LABEL } from '../lib/format';
 import {
   type ApplicationParams,
@@ -76,13 +76,58 @@ function useStatusMove() {
   });
 }
 
-function Row({ a }: { a: ApplicationListItem }) {
+/** Delete applications (with their jobs and timelines), 5 requests at a time. */
+function useDeleteApplications() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      let failed = 0;
+      for (let i = 0; i < ids.length; i += 5) {
+        const results = await Promise.allSettled(
+          ids.slice(i, i + 5).map((id) => del(`/api/applications/${id}`)),
+        );
+        failed += results.filter((r) => r.status === 'rejected').length;
+      }
+      if (failed > 0) {
+        throw new Error(
+          `${failed} of ${ids.length} could not be deleted. Reload the page and try again.`,
+        );
+      }
+    },
+    onSettled: () => invalidateApplications(qc),
+  });
+}
+
+const describeJob = (a: ApplicationListItem) => `${a.job.title} at ${a.job.company}`;
+
+function Row({
+  a,
+  selected,
+  onSelect,
+  onDelete,
+  busy,
+}: {
+  a: ApplicationListItem;
+  selected: boolean;
+  onSelect: (selected: boolean) => void;
+  onDelete: () => void;
+  busy: boolean;
+}) {
   const salary = formatSalary(a.job.salaryMin, a.job.salaryMax, a.job.salaryCurrency);
   return (
-    <li>
+    <li className={clsx('flex items-center hover:bg-sheet-2', selected && 'bg-sheet-2')}>
+      <label className="flex cursor-pointer items-center self-stretch py-3 pr-1 pl-4">
+        <input
+          type="checkbox"
+          className="size-4 accent-[var(--color-accent)]"
+          checked={selected}
+          onChange={(e) => onSelect(e.target.checked)}
+          aria-label={`Select ${describeJob(a)}`}
+        />
+      </label>
       <Link
         to={`/applications/${a.id}`}
-        className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-sheet-2 md:grid-cols-[2fr_1.2fr_7rem_7rem_6rem]"
+        className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 py-3 pr-2 pl-2 md:grid-cols-[2fr_1.2fr_7rem_7rem_6rem]"
       >
         <div className="min-w-0">
           <p className="truncate font-medium text-ink">{a.job.title}</p>
@@ -107,6 +152,16 @@ function Row({ a }: { a: ApplicationListItem }) {
           )}
         </p>
       </Link>
+      <button
+        type="button"
+        onClick={onDelete}
+        disabled={busy}
+        title="Delete"
+        aria-label={`Delete ${describeJob(a)}`}
+        className="mr-2 rounded-md p-2 text-muted hover:bg-[var(--tone-danger)] hover:text-[var(--tone-danger-ink)] disabled:opacity-50"
+      >
+        <Trash2 className="size-4" aria-hidden />
+      </button>
     </li>
   );
 }
@@ -211,6 +266,35 @@ export function Applications() {
     limit: view === 'board' ? 500 : 200,
   };
   const { data, error, isLoading, isFetching } = useApplications(params);
+  const remove = useDeleteApplications();
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // Only rows on screen count, so a filter change never deletes something hidden.
+  const selected = (data?.items ?? []).filter((a) => selectedIds.has(a.id));
+  const allSelected =
+    data !== undefined && data.items.length > 0 && selected.length === data.items.length;
+  const setSelected = (id: string, on: boolean) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const selectAll = (on: boolean) =>
+    setSelectedIds(on ? new Set((data?.items ?? []).map((a) => a.id)) : new Set());
+  const deleteRows = (rows: ApplicationListItem[]) => {
+    const [first] = rows;
+    if (!first) return;
+    const question =
+      rows.length === 1
+        ? `Delete ${describeJob(first)}? Its timeline and notes are deleted too.`
+        : `Delete ${rows.length} applications? Their timelines and notes are deleted too.`;
+    if (!window.confirm(question)) return;
+    const ids = rows.map((a) => a.id);
+    remove.mutate(ids, {
+      onSuccess: () =>
+        setSelectedIds((prev) => new Set([...prev].filter((id) => !ids.includes(id)))),
+    });
+  };
 
   const update = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(search);
@@ -324,6 +408,34 @@ export function Applications() {
         </EmptyState>
       ) : null}
       {data && data.items.length > 0 && view === 'board' ? <Board items={data.items} /> : null}
+      {view === 'list' ? <ErrorNote error={remove.error} className="mb-3" /> : null}
+      {data && view === 'list' && selected.length > 0 ? (
+        <section
+          aria-label="Selected applications"
+          className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-sheet-2 px-3 py-2 text-sm"
+        >
+          <span className="font-medium text-ink" role="status">
+            {selected.length} selected
+          </span>
+          {allSelected ? null : (
+            <Button size="sm" variant="ghost" onClick={() => selectAll(true)}>
+              Select all {data.items.length}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => selectAll(false)}>
+            Clear
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            className="ml-auto"
+            busy={remove.isPending}
+            onClick={() => deleteRows(selected)}
+          >
+            <Trash2 className="size-4" aria-hidden /> Delete {selected.length}
+          </Button>
+        </section>
+      ) : null}
       {data && data.items.length > 0 && view === 'list' ? (
         <div
           className={clsx(
@@ -331,16 +443,35 @@ export function Applications() {
             isFetching && 'opacity-70',
           )}
         >
-          <div className="hidden grid-cols-[2fr_1.2fr_7rem_7rem_6rem] gap-3 border-b border-line px-4 py-2 text-xs font-medium tracking-wide text-muted uppercase md:grid">
-            <span>Job</span>
-            <span>Status</span>
-            <span>Source</span>
-            <span>Applied</span>
-            <span className="text-right">Fit / activity</span>
+          <div className="hidden items-center border-b border-line text-xs font-medium tracking-wide text-muted uppercase md:flex">
+            <label className="flex cursor-pointer items-center py-2 pr-1 pl-4">
+              <input
+                type="checkbox"
+                className="size-4 accent-[var(--color-accent)]"
+                checked={allSelected}
+                onChange={(e) => selectAll(e.target.checked)}
+                aria-label="Select all applications"
+              />
+            </label>
+            <div className="grid flex-1 grid-cols-[2fr_1.2fr_7rem_7rem_6rem] gap-3 py-2 pr-2 pl-2">
+              <span>Job</span>
+              <span>Status</span>
+              <span>Source</span>
+              <span>Applied</span>
+              <span className="text-right">Fit / activity</span>
+            </div>
+            <span className="mr-2 w-8" aria-hidden />
           </div>
           <ul className="divide-y divide-line">
             {data.items.map((a) => (
-              <Row key={a.id} a={a} />
+              <Row
+                key={a.id}
+                a={a}
+                selected={selectedIds.has(a.id)}
+                onSelect={(on) => setSelected(a.id, on)}
+                onDelete={() => deleteRows([a])}
+                busy={remove.isPending}
+              />
             ))}
           </ul>
         </div>
